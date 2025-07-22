@@ -1,0 +1,17 @@
+# preCICE generated files
+**/precice-run/
+**/precice-profiling/
+*.vtu
+*.series
+
+
+# Python generated files
+**/__pycache__/
+*.pyc
+*.pyd
+*.pyo
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store

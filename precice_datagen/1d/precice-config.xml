@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<precice-configuration>
+  <log>
+    <sink filter="%Severity% > info" format="---[ %Severity% ] %Message%" enabled="true" />
+  </log>
+
+  <data:scalar name="Data_1D" />
+
+  <mesh name="Solver-Mesh-1D-Surface" dimensions="2">
+    <use-data name="Data_1D" />
+  </mesh>
+  <mesh name="DataGenerator-Mesh-1D" dimensions="2">
+    <use-data name="Data_1D" />
+  </mesh>
+
+  <participant name="Solver">
+    <provide-mesh name="Solver-Mesh-1D-Surface" />
+    <write-data name="Data_1D" mesh="Solver-Mesh-1D-Surface" />
+    <export:vtu>Data_1D</export:vtu>
+  </participant>
+
+  <participant name="DataGenerator">
+    <provide-mesh name="DataGenerator-Mesh-1D" />
+    <receive-mesh name="Solver-Mesh-1D-Surface" from="Solver"/>
+    <read-data name="Data_1D" mesh="DataGenerator-Mesh-1D" />
+    <mapping:rbf direction="read" from="Solver-Mesh-1D-Surface" to="DataGenerator-Mesh-1D" constraint="consistent">
+      <basis-function:gaussian support-radius="0.1"/>
+    </mapping:rbf>
+    <export:vtu>Data_1D</export:vtu>
+  </participant>
+
+  <m2n:sockets acceptor="Solver" connector="DataGenerator" exchange-directory=".."/>
+
+  <coupling-scheme:serial-explicit>
+    <participants first="Solver" second="DataGenerator" />
+    <time-window-size value="0.1" />
+    <max-time-windows value="10" />
+    <exchange data="Data_1D" mesh="Solver-Mesh-1D-Surface" from="Solver" to="DataGenerator" />
+  </coupling-scheme:serial-explicit>
+
+</precice-configuration>
