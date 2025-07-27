@@ -9,25 +9,28 @@ import itertools
 import precice
 import json
 import os
+import argparse
 
-def main(btype: str = 'discont',
+def main(dim: int,
+         btype: str = 'discont',
          degree: int = 1,
-         newtontol: float = 1e-5):
+         newtontol: float = 1e-5,
+         config_file: str = "precice-config.xml"):
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(script_dir, "..", "datagen", "config.json"), 'r') as f:
         config = json.load(f)["solver"]
     
-    config_path = os.path.join(script_dir, "..", "1d", "precice-config.xml")
+    config_path = os.path.join(script_dir, "..", f"{dim}d", config_file)
     participant = precice.Participant("Solver", config_path, 0, 1)
     
-    # --- Nutils Domain and preCICE Mesh Setup ---
-    mesh_internal_name = "Solver-Mesh-1D-Internal"
-    mesh_boundaries_name = "Solver-Mesh-1D-Boundaries"
-    data_name = "Data_1D"
-    res = config["1d_resolution"]
-    domain_min = config["1d_domain_min"]
-    domain_max = config["1d_domain_max"]
+    mesh_internal_name = f"Solver-Mesh-{dim}D-Internal"
+    mesh_boundaries_name = f"Solver-Mesh-{dim}D-Boundaries"
+    data_name = f"Data_{dim}D"
+    ic_name = f"Initial_Condition_{dim}D"
+    res = config[f"{dim}d_resolution"]
+    domain_min = config[f"{dim}d_domain_min"]
+    domain_max = config[f"{dim}d_domain_max"]
     nelems = res[0] - 1
 
     domain, geom = mesh.line(numpy.linspace(domain_min[0], domain_max[0], nelems+1), periodic=True)
@@ -37,12 +40,9 @@ def main(btype: str = 'discont',
     
     internal_vertex_ids = participant.set_mesh_vertices(mesh_internal_name, internal_coords)
     boundary_vertex_ids = participant.set_mesh_vertices(mesh_boundaries_name, boundary_coords)
-    
-    sample = domain.locate(geom, internal_coords[:, 0], tol=1e-5)
-    internal_coord_to_index = {tuple(coord): i for i, coord in enumerate(internal_coords)}
-    boundary_indices_in_internal_mesh = [internal_coord_to_index[tuple(coord)] for coord in boundary_coords]
 
-    # --- Nutils PDE Setup ---
+    sample = domain.locate(geom, internal_coords[:, 0], tol=1e-5)
+    
     ns = Namespace()
     ns.x = geom
     ns.define_for('x', gradient='∇', normal='n', jacobians=('dV', 'dS'))
@@ -53,24 +53,24 @@ def main(btype: str = 'discont',
     ns.dt = ns.t - function.field('t0')
     ns.f = '.5 u^2'
     ns.C = 1
-    ns.uinit = 'exp(-25 (x - 0.5)^2)'
 
     res_pde = domain.integral('(v du / dt - ∇(v) f) dV' @ ns, degree=degree*2)
     res_pde -= domain.interfaces.integral('[v] n ({f} - .5 C [u] n) dS' @ ns, degree=degree*2)
-
-    sqr = domain.integral('(u - uinit)^2 dV' @ ns, degree=max(degree*2, 5))
-    args = System(sqr, trial='u').solve()
-    args['t'] = 0.
-
     system = System(res_pde, trial='u', test='v')
 
-    if participant.requires_initial_data():
-        internal_data_values = sample.eval(ns.u, **args)
-        boundary_data_values = internal_data_values[boundary_indices_in_internal_mesh]
-        participant.write_data(mesh_internal_name, data_name, internal_vertex_ids, internal_data_values)
-        participant.write_data(mesh_boundaries_name, data_name, boundary_vertex_ids, boundary_data_values)
+    if not participant.requires_initial_data():
+        participant.initialize()
+        initial_condition_values = participant.read_data(mesh_internal_name, ic_name, internal_vertex_ids, 0.0)
+        
+        ns.uic = domain.basis('spline', degree=2).dot(initial_condition_values[:-1])
 
-    participant.initialize()
+        sqr = domain.integral('(u - uic)^2 dV' @ ns, degree=max(degree*2, 5))
+        args = System(sqr, trial='u').solve()
+    else:
+        participant.initialize()
+        args = {}
+
+    args['t'] = 0.
 
     with log.iter.plain('timestep', itertools.count()) as steps:
         for _ in steps:
@@ -79,11 +79,10 @@ def main(btype: str = 'discont',
 
             timestep = participant.get_max_time_step_size()
 
-            log.info('time:', round(args['t'], 10))
-
             args = system.step(timestep=timestep, arguments=args, timearg='t', suffix='0', tol=newtontol)
 
-            internal_data_values = sample.eval(ns.u, **args)
+            internal_data_values = sample.eval(ns.u, arguments=args)
+            boundary_indices_in_internal_mesh = [numpy.where((internal_coords == b).all(axis=1))[0][0] for b in boundary_coords]
             boundary_data_values = internal_data_values[boundary_indices_in_internal_mesh]
             participant.write_data(mesh_internal_name, data_name, internal_vertex_ids, internal_data_values)
             participant.write_data(mesh_boundaries_name, data_name, boundary_vertex_ids, boundary_data_values)
@@ -91,8 +90,15 @@ def main(btype: str = 'discont',
             participant.advance(timestep)
 
     participant.finalize()
-    return args
 
 if __name__ == '__main__':
-    from nutils import cli
-    cli.run(main)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dim", type=int, choices=[1, 2], help="Dimension of the simulation")
+    parser.add_argument('--config_file', type=str, default="precice-config.xml")
+    parser.add_argument('--btype', type=str, default='discont')
+    parser.add_argument('--degree', type=int, default=1)
+    parser.add_argument('--newtontol', type=float, default=1e-5)
+    
+    args_cli = parser.parse_args()
+
+    main(dim=args_cli.dim, btype=args_cli.btype, degree=args_cli.degree, newtontol=args_cli.newtontol, config_file=args_cli.config_file)
