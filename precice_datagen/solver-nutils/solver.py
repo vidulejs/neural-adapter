@@ -53,7 +53,7 @@ def main(btype: str = 'discont',
     ns.dt = ns.t - function.field('t0')
     ns.f = '.5 u^2'
     ns.C = 1
-    ns.uinit = 'exp(-25 x^2)'
+    ns.uinit = 'exp(-25 (x - 0.5)^2)'
 
     res_pde = domain.integral('(v du / dt - ∇(v) f) dV' @ ns, degree=degree*2)
     res_pde -= domain.interfaces.integral('[v] n ({f} - .5 C [u] n) dS' @ ns, degree=degree*2)
@@ -63,6 +63,12 @@ def main(btype: str = 'discont',
     args['t'] = 0.
 
     system = System(res_pde, trial='u', test='v')
+
+    if participant.requires_initial_data():
+        internal_data_values = sample.eval(ns.u, **args)
+        boundary_data_values = internal_data_values[boundary_indices_in_internal_mesh]
+        participant.write_data(mesh_internal_name, data_name, internal_vertex_ids, internal_data_values)
+        participant.write_data(mesh_boundaries_name, data_name, boundary_vertex_ids, boundary_data_values)
 
     participant.initialize()
 
@@ -75,14 +81,14 @@ def main(btype: str = 'discont',
 
             log.info('time:', round(args['t'], 10))
 
+            args = system.step(timestep=timestep, arguments=args, timearg='t', suffix='0', tol=newtontol)
+
             internal_data_values = sample.eval(ns.u, **args)
             boundary_data_values = internal_data_values[boundary_indices_in_internal_mesh]
             participant.write_data(mesh_internal_name, data_name, internal_vertex_ids, internal_data_values)
             participant.write_data(mesh_boundaries_name, data_name, boundary_vertex_ids, boundary_data_values)
 
             participant.advance(timestep)
-
-            args = system.step(timestep=timestep, arguments=args, timearg='t', suffix='0', tol=newtontol)
 
     participant.finalize()
     return args

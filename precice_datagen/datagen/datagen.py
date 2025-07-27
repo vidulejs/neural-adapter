@@ -16,8 +16,15 @@ class DataGenerator:
         self.participant = precice.Participant("DataGenerator", config_path, 0, 1)
 
         self.setup_mesh()
+
+        if self.participant.requires_initial_data():
+            self.read_data()
+
         self.participant.initialize()
-        self.data = {}
+        self.data = {
+            self.mesh_internal_name: [],
+            self.mesh_boundaries_name: []
+        }
 
     def setup_mesh(self):
         if self.dim == 1:
@@ -71,24 +78,32 @@ class DataGenerator:
             self.participant.advance(dt)
 
         self.participant.finalize()
-        self.print_data()
+        self.save_data()
 
     def read_data(self):
         if self.dim == 1:
             internal_read_values = self.participant.read_data(self.mesh_internal_name, self.data_name, self.internal_vertex_ids, 0.0)
-            self.data[self.mesh_internal_name] = internal_read_values
+            self.data[self.mesh_internal_name].append(internal_read_values)
             boundary_read_values = self.participant.read_data(self.mesh_boundaries_name, self.data_name, self.boundary_vertex_ids, 0.0)
-            self.data[self.mesh_boundaries_name] = boundary_read_values
+            self.data[self.mesh_boundaries_name].append(boundary_read_values)
         else:
             internal_read_values = self.participant.read_data(self.mesh_internal_name, self.data_name, self.internal_vertex_ids, 0.0)
-            self.data[self.mesh_internal_name] = internal_read_values
+            self.data[self.mesh_internal_name].append(internal_read_values)
             boundary_read_values = self.participant.read_data(self.mesh_boundaries_name, self.data_name, self.boundary_vertex_ids, 0.0)
-            self.data[self.mesh_boundaries_name] = boundary_read_values
+            self.data[self.mesh_boundaries_name].append(boundary_read_values)
 
     def print_data(self):
         print("--- DataGenerator Results ---")
         for key, value in self.data.items():
             print(f"Received data '{key}' with shape {value.shape}")
+
+    def save_data(self):
+        if self.dim == 1:
+            output_file = "burgers_data.npz"
+            np.savez(output_file, **self.data)
+            print(f"Data saved to {output_file}")
+        else:
+            print("Data saving for 2D is not implemented yet.")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2 or sys.argv[1] not in ["1", "2"]:

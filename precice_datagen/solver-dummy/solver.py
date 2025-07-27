@@ -16,6 +16,12 @@ class Solver:
         self.participant = precice.Participant("Solver", config_path, 0, 1)
 
         self.setup_mesh()
+
+        if self.participant.requires_initial_data():
+            internal_data_values = np.zeros(len(self.internal_vertex_ids))
+            boundary_data_values = internal_data_values[self.boundary_indices_in_internal_mesh]
+            self.write_data(internal_data_values, boundary_data_values)
+
         self.participant.initialize()
 
     def setup_mesh(self):
