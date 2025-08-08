@@ -5,10 +5,13 @@ import json
 
 def plot_data():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(script_dir, "datagen", "burgers_data.npz")
+    data_path = os.path.join(script_dir, "datagen", "burgers_data_epoch_3.npz")
     config_path = os.path.join(script_dir, "datagen", "config.json")
 
     internal_mesh_name = 'DataGenerator-Mesh-1D-Internal'
+
+    config = json.load(open(config_path, 'r'))["datagen"]
+    data = np.load(data_path)
 
     time_evolution_data = np.vstack(data[internal_mesh_name])
 
@@ -27,9 +30,6 @@ def plot_data():
     plt.ylabel('Position (x)')
     plt.xlabel('Time Step')
 
-    plot_filename = 'burgers_evolution.png'
-    plt.savefig(plot_filename)
-    print(f"Plot saved to {plot_filename}")
 
     plt.show()
 

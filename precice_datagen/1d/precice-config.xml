@@ -7,39 +7,53 @@
   <data:scalar name="Data_1D" />
   <data:scalar name="Initial_Condition_1D" />
 
+  <mesh name="Solver-Mesh-1D-Boundaries" dimensions="2">
+    <use-data name="Data_1D" />
+  </mesh>
+
   <mesh name="Solver-Mesh-1D-Internal" dimensions="2">
     <use-data name="Data_1D" />
     <use-data name="Initial_Condition_1D" />
   </mesh>
+
+  <mesh name="DataGenerator-Mesh-1D-Boundaries" dimensions="2">
+    <use-data name="Data_1D" />
+  </mesh>
+
   <mesh name="DataGenerator-Mesh-1D-Internal" dimensions="2">
     <use-data name="Data_1D" />
     <use-data name="Initial_Condition_1D" />
-  </mesh>
-  <mesh name="Solver-Mesh-1D-Boundaries" dimensions="2">
-    <use-data name="Data_1D" />
-  </mesh>
-  <mesh name="DataGenerator-Mesh-1D-Boundaries" dimensions="2">
-    <use-data name="Data_1D" />
   </mesh>
 
   <participant name="Solver">
     <provide-mesh name="Solver-Mesh-1D-Internal" />
     <provide-mesh name="Solver-Mesh-1D-Boundaries" />
+
     <receive-mesh name="DataGenerator-Mesh-1D-Internal" from="DataGenerator"/>
-    <write-data name="Data_1D" mesh="Solver-Mesh-1D-Internal" />
+
     <read-data name="Initial_Condition_1D" mesh="Solver-Mesh-1D-Internal" />
+    <!-- <read-data name="Initial_Condition_1D" mesh="Solver-Mesh-1D-Boundaries" /> -->
+
+    <write-data name="Data_1D" mesh="Solver-Mesh-1D-Internal" />
     <write-data name="Data_1D" mesh="Solver-Mesh-1D-Boundaries" />
+
     <mapping:nearest-neighbor direction="read" from="DataGenerator-Mesh-1D-Internal" to="Solver-Mesh-1D-Internal" constraint="consistent"/>
+    <!-- <mapping:nearest-neighbor direction="read" from="DataGenerator-Mesh-1D-Boundaries" to="Solver-Mesh-1D-Boundaries" constraint="consistent"/> -->
+
   </participant>
 
   <participant name="DataGenerator">
     <provide-mesh name="DataGenerator-Mesh-1D-Internal" />
     <provide-mesh name="DataGenerator-Mesh-1D-Boundaries" />
+
     <receive-mesh name="Solver-Mesh-1D-Internal" from="Solver"/>
     <receive-mesh name="Solver-Mesh-1D-Boundaries" from="Solver"/>
+
     <read-data name="Data_1D" mesh="DataGenerator-Mesh-1D-Internal" />
-    <write-data name="Initial_Condition_1D" mesh="DataGenerator-Mesh-1D-Internal" />
     <read-data name="Data_1D" mesh="DataGenerator-Mesh-1D-Boundaries" />
+
+    <write-data name="Initial_Condition_1D" mesh="DataGenerator-Mesh-1D-Internal" />
+
     <mapping:nearest-neighbor direction="read" from="Solver-Mesh-1D-Internal" to="DataGenerator-Mesh-1D-Internal" constraint="consistent"/>
     <mapping:nearest-neighbor direction="read" from="Solver-Mesh-1D-Boundaries" to="DataGenerator-Mesh-1D-Boundaries" constraint="consistent"/>
   </participant>
@@ -48,8 +62,8 @@
 
   <coupling-scheme:serial-explicit>
     <participants first="DataGenerator" second="Solver" />
-    <time-window-size value="0.1" />
-    <max-time-windows value="10" />
+    <time-window-size value="0.01" />
+    <max-time value="1.0" />
     <exchange data="Data_1D" mesh="Solver-Mesh-1D-Internal" from="Solver" to="DataGenerator" />
     <exchange data="Data_1D" mesh="Solver-Mesh-1D-Boundaries" from="Solver" to="DataGenerator" />
     <exchange data="Initial_Condition_1D" mesh="DataGenerator-Mesh-1D-Internal" from="DataGenerator" to="Solver" initialize="yes" />

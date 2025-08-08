@@ -1,19 +1,18 @@
 {
   "datagen": {
-    "1d_resolution": [256],
+    "1d_resolution": [128],
     "2d_resolution": [64, 64],
     "domain_min": [0.0, 0.0],
     "domain_max": [1.0, 1.0],
-    "time_window_size": 0.1,
-    "epochs": 5,
+    "epochs": 100,
     "initial_conditions": {
       "type": "sinusoidal",
-      "amplitude_range": [0.5, 1.5],
-      "wavenumber_range": [1, 5]
+      "wavenumber_range": [1, 10],
+      "num_modes": 3
     }
   },
   "solver": {
-    "1d_resolution": [256],
+    "1d_resolution": [128],
     "1d_domain_min": [0.0, 0.0],
     "1d_domain_max": [1.0, 0.0],
     "2d_resolution": [32, 16],

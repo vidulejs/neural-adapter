@@ -18,7 +18,6 @@ class DataGenerator:
         config_path = os.path.abspath(os.path.join(script_dir, "..", f"{self.dim}d", self.config_file))
         self.participant = precice.Participant("DataGenerator", config_path, 0, 1)
 
-        self.dt = self.config["time_window_size"]
         self.setup_mesh()
 
     def setup_mesh(self):
@@ -41,14 +40,20 @@ class DataGenerator:
         ic_config = self.config["initial_conditions"]
         np.random.seed(epoch)
         
+        x_coords = self.internal_coords[:, 0]
+        ic_values = np.zeros(len(self.internal_vertex_ids))
+
         if ic_config["type"] == "sinusoidal":
-            amp = np.random.uniform(ic_config["amplitude_range"][0], ic_config["amplitude_range"][1])
-            k = np.random.randint(ic_config["wavenumber_range"][0], ic_config["wavenumber_range"][1] + 1)
-            x_coords = self.internal_coords[:, 0]
-            ic_values = amp * np.sin(2 * np.pi * k * x_coords)
-            return ic_values
-        else:
-            return np.zeros(len(self.internal_vertex_ids))
+            num_modes = ic_config.get("num_modes", 1)
+            for _ in range(num_modes):
+                # Generate each mode with a random amplitude to create varied internal scales
+                amp = np.random.uniform(0.1, 2)
+                k = np.random.randint(ic_config["wavenumber_range"][0], ic_config["wavenumber_range"][1] + 1)
+                phase_shift = np.random.uniform(0, 2 * np.pi)
+                ic_values += amp * np.sin(2 * np.pi * k * x_coords + phase_shift)
+        
+            
+        return ic_values
 
     def run(self):
         initial_condition = self._generate_initial_condition(self.epoch)
@@ -57,6 +62,8 @@ class DataGenerator:
 
         self.participant.initialize()
         
+        dt = self.participant.get_max_time_step_size()
+
         boundary_indices = [np.where((self.internal_coords == b).all(axis=1))[0][0] for b in self.boundary_coords]
         initial_boundary_condition = initial_condition[boundary_indices]
 
@@ -66,7 +73,7 @@ class DataGenerator:
         }
 
         while self.participant.is_coupling_ongoing():
-            self.participant.advance(self.dt)
+            self.participant.advance(dt)
             self.read_data()
 
         self.participant.finalize()
