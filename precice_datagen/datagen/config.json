@@ -7,7 +7,7 @@
     "epochs": 100,
     "initial_conditions": {
       "type": "sinusoidal",
-      "wavenumber_range": [1, 10],
+      "wavenumber_range": [1, 5],
       "num_modes": 3
     }
   },

@@ -5,7 +5,8 @@ import json
 
 def plot_data():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(script_dir, "datagen", "burgers_data_epoch_3.npz")
+    number = input("Enter the file number:")
+    data_path = os.path.join(script_dir, "datagen", "burgers_data_epoch_"+number+ ".npz")
     config_path = os.path.join(script_dir, "datagen", "config.json")
 
     internal_mesh_name = 'DataGenerator-Mesh-1D-Internal'

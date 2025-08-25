@@ -10,5 +10,5 @@ epochs=$(python3 -c "import json; print(json.load(open('config.json'))['datagen'
 for (( i=0; i<epochs; i++ ))
 do
    echo "--- Starting Datagen Epoch $i ---"
-   python3 datagen.py $1 --epoch $i
+   timeout 60s python3 datagen.py $1 --epoch $i || if [ $? -eq 124 ]; then echo "Datagen for epoch $i timed out. Continuing to next epoch."; else exit $?; fi
 done
