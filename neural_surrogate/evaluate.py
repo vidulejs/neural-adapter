@@ -3,22 +3,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 from model import MLP
 import os
-import argparse
+from config import (
+    DATA_DIR,
+    MODEL_PATH,
+    INPUT_SIZE,
+    HIDDEN_SIZE,
+    OUTPUT_SIZE,
+    EVAL_ROLLOUT_STEPS,
+)
 
-def evaluate(args):
-    model = MLP(input_size=128, hidden_size=256, output_size=128)
-    model.load_state_dict(torch.load(args.model_path))
+def evaluate():
+    model = MLP(input_size=INPUT_SIZE, hidden_size=HIDDEN_SIZE, output_size=OUTPUT_SIZE)
+    model.load_state_dict(torch.load(MODEL_PATH))
     model.eval()
 
-    npz_files = [f for f in os.listdir(args.data_dir) if f.endswith('.npz')]
+    npz_files = [f for f in os.listdir(DATA_DIR) if f.endswith('.npz')]
     if not npz_files:
         print("No .npz files found for evaluation.")
         return
     
-    data_path = os.path.join(args.data_dir, npz_files[0])
+    data_path = os.path.join(DATA_DIR, npz_files[0])
     raw_data = np.load(data_path)['DataGenerator-Mesh-1D-Internal']
 
-    rollout_steps = 50
+    rollout_steps = EVAL_ROLLOUT_STEPS
     
     if raw_data.shape[0] <= rollout_steps:
         print(f"Data file {npz_files[0]} has only {raw_data.shape[0]} steps, not enough for a rollout of {rollout_steps} steps.")
@@ -65,8 +72,4 @@ def evaluate(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Evaluate the neural surrogate model.')
-    parser.add_argument('--data_dir', type=str, default='/home/dan/Desktop/neural-adapter/precice_datagen/datagen', help='Directory containing the training data.')
-    parser.add_argument('--model_path', type=str, default='burgers_surrogate.pth', help='Path to the trained model.')
-    args = parser.parse_args()
-    evaluate(args)
+    evaluate()

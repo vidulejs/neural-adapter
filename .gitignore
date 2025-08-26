@@ -15,3 +15,8 @@
 .vscode/
 .idea/
 .DS_Store
+
+# Data files
+precice_datagen/datagen/*.npz
+*.txt
+*.png

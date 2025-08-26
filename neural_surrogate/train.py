@@ -3,22 +3,32 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from model import MLP
 from dataset import BurgersDataset
-import argparse
+from config import (
+    DATA_DIR,
+    MODEL_PATH,
+    INPUT_SIZE,
+    HIDDEN_SIZE,
+    OUTPUT_SIZE,
+    EPOCHS,
+    BATCH_SIZE,
+    LR,
+    SPLIT,
+)
 
-def train(args):
-    dataset = BurgersDataset(data_dir=args.data_dir)
-    train_size = int(0.8 * len(dataset))
+def train():
+    dataset = BurgersDataset(data_dir=DATA_DIR)
+    train_size = int(SPLIT * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    model = MLP(input_size=128, hidden_size=args.hidden_size, output_size=128)
+    model = MLP(input_size=INPUT_SIZE, hidden_size=HIDDEN_SIZE, output_size=OUTPUT_SIZE)
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
-    for epoch in range(args.epochs):
+    for epoch in range(EPOCHS):
         model.train()
         for x, y in train_loader:
             optimizer.zero_grad()
@@ -35,19 +45,10 @@ def train(args):
                 val_loss += criterion(y_pred, y).item()
         
         val_loss /= len(val_loader)
-        print(f"Epoch {epoch+1}/{args.epochs}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}")
+        print(f"Epoch {epoch+1}/{EPOCHS}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}")
 
-    torch.save(model.state_dict(), args.model_path)
-    print(f"Model saved to {args.model_path}")
+    torch.save(model.state_dict(), MODEL_PATH)
+    print(f"Model saved to {MODEL_PATH}")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Train a neural surrogate for the 1D Burgers equation.')
-    parser.add_argument('--data_dir', type=str, default='/home/dan/Desktop/neural-adapter/precice_datagen/datagen', help='Directory containing the training data.')
-    parser.add_argument('--model_path', type=str, default='burgers_surrogate.pth', help='Path to save the trained model.')
-    parser.add_argument('--hidden_size', type=int, default=256, help='Number of neurons in hidden layers.')
-    parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs.')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training.')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate.')
-    
-    args = parser.parse_args()
-    train(args)
+    train()
