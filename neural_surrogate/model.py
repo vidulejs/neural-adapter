@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -14,7 +15,6 @@ class MLP(nn.Module):
 
     def forward(self, x):
         return self.layers(x)
-
 
 class MLP_RES(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):

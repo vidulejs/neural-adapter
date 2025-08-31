@@ -9,7 +9,6 @@ from config import (
     INPUT_SIZE,
     HIDDEN_SIZE,
     OUTPUT_SIZE,
-    EVAL_ROLLOUT_STEPS,
 )
 
 def evaluate():
@@ -25,12 +24,9 @@ def evaluate():
     data_path = os.path.join(DATA_DIR, npz_files[0])
     raw_data = np.load(data_path)['DataGenerator-Mesh-1D-Internal']
 
-    rollout_steps = EVAL_ROLLOUT_STEPS
+    rollout_steps = raw_data.shape[0] - 1
     
-    if raw_data.shape[0] <= rollout_steps:
-        print(f"Data file {npz_files[0]} has only {raw_data.shape[0]} steps, not enough for a rollout of {rollout_steps} steps.")
-        return
-    start_index = np.random.randint(0, raw_data.shape[0] - rollout_steps - 1)
+    start_index = 0
     
     x0_np = raw_data[start_index]
     ground_truth = raw_data[start_index : start_index + rollout_steps + 1]
