@@ -89,14 +89,17 @@ class DataGenerator:
     def save_data(self):
         if self.dim == 1:
             output_file = f"burgers_data_epoch_{self.epoch}.npz"
-            np.savez(output_file, **self.data)
-            print(f"Data for epoch {self.epoch} saved to {output_file}")
+            output_path = os.path.join(args.output_path, output_file)
+            os.makedirs(args.output_path, exist_ok=True)
+            np.savez(output_path, **self.data)
+            print(f"Data for epoch {self.epoch} saved to {output_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("dim", type=int, choices=[1, 2], help="Dimension of the simulation")
     parser.add_argument("--epoch", type=int, default=0, help="Current epoch number")
     parser.add_argument("--config", type=str, default="precice-config.xml", help="preCICE configuration file")
+    parser.add_argument("--output-path", type=str, default=".", help="Directory to save the generated data")
     args = parser.parse_args()
 
     datagen = DataGenerator(args.dim, args.epoch, args.config)

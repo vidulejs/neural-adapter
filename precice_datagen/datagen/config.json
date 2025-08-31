@@ -1,9 +1,9 @@
 {
   "datagen": {
-    "1d_resolution": [128],
+    "1d_resolution": [256],
     "2d_resolution": [64, 64],
     "domain_min": [0.0, 0.0],
-    "domain_max": [1.0, 1.0],
+    "domain_max": [2.0, 1.0],
     "epochs": 100,
     "initial_conditions": {
       "type": "sinusoidal",
@@ -12,9 +12,9 @@
     }
   },
   "solver": {
-    "1d_resolution": [128],
+    "1d_resolution": [256],
     "1d_domain_min": [0.0, 0.0],
-    "1d_domain_max": [1.0, 0.0],
+    "1d_domain_max": [2.0, 0.0],
     "2d_resolution": [32, 16],
     "2d_domain_min": [0.0, 0.0],
     "2d_domain_max": [1.0, 1.0]
