@@ -4,7 +4,7 @@
     <sink filter="%Severity% > info" format="---[ %Severity% ] %Message%" enabled="true" />
   </log>
 
-  <data:scalar name="Data_2D" />
+  <data:vector name="Data_2D" />
 
   <mesh name="Solver-Mesh-2D-Internal" dimensions="2">
     <use-data name="Data_2D" />
@@ -34,12 +34,16 @@
     <receive-mesh name="Solver-Mesh-2D-Boundaries" from="Solver"/>
     <read-data name="Data_2D" mesh="DataGenerator-Mesh-2D-Internal" />
     <read-data name="Data_2D" mesh="DataGenerator-Mesh-2D-Boundaries" />
-    <mapping:rbf direction="read" from="Solver-Mesh-2D-Internal" to="DataGenerator-Mesh-2D-Internal" constraint="consistent">
+<!--     <mapping:rbf direction="read" from="Solver-Mesh-2D-Internal" to="DataGenerator-Mesh-2D-Internal" constraint="consistent">
       <basis-function:gaussian support-radius="0.1"/>
     </mapping:rbf>
     <mapping:rbf direction="read" from="Solver-Mesh-2D-Boundaries" to="DataGenerator-Mesh-2D-Boundaries" constraint="consistent">
       <basis-function:gaussian support-radius="0.1"/>
-    </mapping:rbf>
+    </mapping:rbf> -->
+
+    <mapping:nearest-neighbor direction="read" from="Solver-Mesh-2D-Internal" to="DataGenerator-Mesh-2D-Internal" constraint="consistent"/>
+    <mapping:nearest-neighbor direction="read" from="Solver-Mesh-2D-Boundaries" to="DataGenerator-Mesh-2D-Boundaries" constraint="consistent"/>
+
     <export:vtu directory="vtu" />
   </participant>
 
