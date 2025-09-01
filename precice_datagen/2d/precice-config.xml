@@ -12,12 +12,6 @@
   <mesh name="Solver-Mesh-2D-Boundaries" dimensions="2">
     <use-data name="Data_2D" />
   </mesh>
-  <mesh name="DataGenerator-Mesh-2D-Internal" dimensions="2">
-    <use-data name="Data_2D" />
-  </mesh>
-  <mesh name="DataGenerator-Mesh-2D-Boundaries" dimensions="2">
-    <use-data name="Data_2D" />
-  </mesh>
 
   <participant name="Solver">
     <provide-mesh name="Solver-Mesh-2D-Internal" />
@@ -28,22 +22,10 @@
   </participant>
 
   <participant name="DataGenerator">
-    <provide-mesh name="DataGenerator-Mesh-2D-Internal" />
-    <provide-mesh name="DataGenerator-Mesh-2D-Boundaries" />
-    <receive-mesh name="Solver-Mesh-2D-Internal" from="Solver"/>
-    <receive-mesh name="Solver-Mesh-2D-Boundaries" from="Solver"/>
-    <read-data name="Data_2D" mesh="DataGenerator-Mesh-2D-Internal" />
-    <read-data name="Data_2D" mesh="DataGenerator-Mesh-2D-Boundaries" />
-<!--     <mapping:rbf direction="read" from="Solver-Mesh-2D-Internal" to="DataGenerator-Mesh-2D-Internal" constraint="consistent">
-      <basis-function:gaussian support-radius="0.1"/>
-    </mapping:rbf>
-    <mapping:rbf direction="read" from="Solver-Mesh-2D-Boundaries" to="DataGenerator-Mesh-2D-Boundaries" constraint="consistent">
-      <basis-function:gaussian support-radius="0.1"/>
-    </mapping:rbf> -->
-
-    <mapping:nearest-neighbor direction="read" from="Solver-Mesh-2D-Internal" to="DataGenerator-Mesh-2D-Internal" constraint="consistent"/>
-    <mapping:nearest-neighbor direction="read" from="Solver-Mesh-2D-Boundaries" to="DataGenerator-Mesh-2D-Boundaries" constraint="consistent"/>
-
+    <receive-mesh name="Solver-Mesh-2D-Internal" from="Solver" api-access="true"/>
+    <receive-mesh name="Solver-Mesh-2D-Boundaries" from="Solver" api-access="true"/>
+    <read-data name="Data_2D" mesh="Solver-Mesh-2D-Internal" />
+    <read-data name="Data_2D" mesh="Solver-Mesh-2D-Boundaries" />
     <export:vtu directory="vtu" />
   </participant>
 

@@ -21,37 +21,29 @@ class DataGenerator:
         self.setup_mesh()
 
     def setup_mesh(self):
-        self.mesh_internal_name = "DataGenerator-Mesh-2D-Internal"
-        self.mesh_boundaries_name = "DataGenerator-Mesh-2D-Boundaries"
+        self.solver_mesh_internal_name = "Solver-Mesh-2D-Internal"
+        self.solver_mesh_boundaries_name = "Solver-Mesh-2D-Boundaries"
         self.data_name = "Data_2D"
-        
-        res = self.config["2d_resolution"]
-        domain_min = self.config["domain_min"]
-        domain_max = self.config["domain_max"]
-
-        x = np.linspace(domain_min[0], domain_max[0], res[0])
-        y = np.linspace(domain_min[1], domain_max[1], res[1])
-        xx, yy = np.meshgrid(x, y)
-        self.internal_coords = np.vstack((xx.ravel(), yy.ravel())).T
-        self.internal_vertex_ids = self.participant.set_mesh_vertices(self.mesh_internal_name, self.internal_coords)
-
-        # Define boundaries (e.g., 4 corners of a rectangle)
-        self.boundary_coords = np.array([
-            [domain_min[0], domain_min[1]],
-            [domain_max[0], domain_min[1]],
-            [domain_min[0], domain_max[1]],
-            [domain_max[0], domain_max[1]]
-        ])
-        self.boundary_vertex_ids = self.participant.set_mesh_vertices(self.mesh_boundaries_name, self.boundary_coords)
 
     def run(self):
+        # Define the region of interest before initialization
+        bounding_box = self.config["2d_bounding_box"]
+        self.participant.set_mesh_access_region(self.solver_mesh_internal_name, bounding_box)
+        self.participant.set_mesh_access_region(self.solver_mesh_boundaries_name, bounding_box)
+
         self.participant.initialize()
+
+        # Get mesh info from solver AFTER initialize
+        self.internal_vertex_ids, self.internal_coords = self.participant.get_mesh_vertex_ids_and_coordinates(self.solver_mesh_internal_name)
+        self.boundary_vertex_ids, self.boundary_coords = self.participant.get_mesh_vertex_ids_and_coordinates(self.solver_mesh_boundaries_name)
         
         dt = self.participant.get_max_time_step_size()
 
         self.data = {
-            self.mesh_internal_name: [],
-            self.mesh_boundaries_name: []
+            self.solver_mesh_internal_name: [],
+            self.solver_mesh_boundaries_name: [],
+            "internal_coordinates": self.internal_coords,
+            "boundary_coordinates": self.boundary_coords
         }
 
         while self.participant.is_coupling_ongoing():
@@ -62,10 +54,10 @@ class DataGenerator:
         self.save_data()
 
     def read_data(self):
-        internal_read_values = self.participant.read_data(self.mesh_internal_name, self.data_name, self.internal_vertex_ids, 0.0)
-        self.data[self.mesh_internal_name].append(internal_read_values)
-        boundary_read_values = self.participant.read_data(self.mesh_boundaries_name, self.data_name, self.boundary_vertex_ids, 0.0)
-        self.data[self.mesh_boundaries_name].append(boundary_read_values)
+        internal_read_values = self.participant.read_data(self.solver_mesh_internal_name, self.data_name, self.internal_vertex_ids, 0.0)
+        self.data[self.solver_mesh_internal_name].append(internal_read_values)
+        boundary_read_values = self.participant.read_data(self.solver_mesh_boundaries_name, self.data_name, self.boundary_vertex_ids, 0.0)
+        self.data[self.solver_mesh_boundaries_name].append(boundary_read_values)
 
     def save_data(self):
         output_file = f"flow_data_epoch_{self.epoch}.npz"
@@ -73,8 +65,8 @@ class DataGenerator:
         os.makedirs(args.output_path, exist_ok=True)
         
         # Convert lists to numpy arrays for saving
-        for key in self.data:
-            self.data[key] = np.array(self.data[key])
+        self.data[self.solver_mesh_internal_name] = np.array(self.data[self.solver_mesh_internal_name])
+        self.data[self.solver_mesh_boundaries_name] = np.array(self.data[self.solver_mesh_boundaries_name])
             
         np.savez(output_path, **self.data)
         print(f"Data for epoch {self.epoch} saved to {output_path}")
