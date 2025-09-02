@@ -90,7 +90,7 @@ class Solver:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2 or sys.argv[1] not in ["1", "2"]:
-        print("Usage: python -m precice_datagen.solver.solver [1|2]")
+        print("Usage: python solver.py [1|2]")
         sys.exit(1)
     solver = Solver(int(sys.argv[1]))
     solver.run()

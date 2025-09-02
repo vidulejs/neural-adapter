@@ -16,9 +16,12 @@
 .idea/
 .DS_Store
 
-# Data files
-precice_datagen/datagen/*.npz
-precice_datagen/datagen/*/*.npz
-*.txt
-GEMINI.md
+# Generated data and simulation runs
+/data/
+simulations/.transport-openfoam/
+
+# Other
+.ipynb_checkpoints/
 *.bak
+neural_surrogate/models/
+*.md
