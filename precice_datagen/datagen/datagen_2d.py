@@ -4,18 +4,22 @@ import os
 import sys
 import json
 import argparse
+import yaml
 
 class DataGenerator:
-    def __init__(self, epoch, config_file="precice-config.xml"):
+    def __init__(self, epoch, config_file="precice-config.xml", param_file=None):
         self.dim = 2
         self.epoch = epoch
         self.config_file = config_file
-        script_dir = os.path.dirname(os.path.abspath(__file__))
         
-        with open(os.path.join(script_dir, "config.json"), 'r') as f:
-            self.config = json.load(f)["datagen"]
+        if not param_file:
+            raise ValueError("A parameter file (--params) is required.")
+            
+        with open(param_file, 'r') as f:
+            self.params = yaml.safe_load(f)
 
-        config_path = os.path.abspath(os.path.join(script_dir, "..", f"{self.dim}d", self.config_file))
+
+        config_path = os.path.abspath(self.config_file)
         self.participant = precice.Participant("DataGenerator", config_path, 0, 1)
 
         self.setup_mesh()
@@ -26,8 +30,15 @@ class DataGenerator:
         self.data_name = "Data_2D"
 
     def run(self):
-        # Define the region of interest before initialization
-        bounding_box = self.config["2d_bounding_box"]
+        # Define the region of interest from the loaded parameters
+        domain = self.params['domain']
+        epsilon = 1e-5 # Small padding to avoid floating point issues
+        x_min = domain.get('x_min', 0.0) - epsilon
+        y_min = domain.get('y_min', 0.0) - epsilon
+        x_max = x_min + domain['width'] + (2 * epsilon)
+        y_max = y_min + domain['height'] + (2 * epsilon)
+        bounding_box = [x_min, x_max, y_min, y_max]
+        
         self.participant.set_mesh_access_region(self.solver_mesh_internal_name, bounding_box)
         self.participant.set_mesh_access_region(self.solver_mesh_boundaries_name, bounding_box)
 
@@ -76,7 +87,8 @@ if __name__ == "__main__":
     parser.add_argument("--epoch", type=int, default=0, help="Current epoch number")
     parser.add_argument("--config", type=str, default="precice-config.xml", help="preCICE configuration file")
     parser.add_argument("--output-path", type=str, default=".", help="Directory to save the generated data")
+    parser.add_argument("--params", type=str, required=True, help="Path to the YAML parameter file for this run.")
     args = parser.parse_args()
 
-    datagen = DataGenerator(args.epoch, args.config)
+    datagen = DataGenerator(args.epoch, args.config, args.params)
     datagen.run()

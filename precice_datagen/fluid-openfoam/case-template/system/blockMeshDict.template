@@ -1,0 +1,134 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+
+vertices
+(
+    (0 0 0)                                        // 0
+    ({{ obstacle.x_min }} 0 0)                     // 1
+    ({{ obstacle.x_max }} 0 0)                     // 2
+    ({{ domain.width }} 0 0)                       // 3
+    (0 {{ obstacle.height }} 0)                    // 4
+    ({{ obstacle.x_min }} {{ obstacle.height }} 0) // 5
+    ({{ obstacle.x_max }} {{ obstacle.height }} 0) // 6
+    ({{ domain.width }} {{ obstacle.height }} 0)   // 7
+    (0 {{ domain.height }} 0)                      // 8
+    ({{ obstacle.x_min }} {{ domain.height }} 0)   // 9
+    ({{ obstacle.x_max }} {{ domain.height }} 0)   // 10
+    ({{ domain.width }} {{ domain.height }} 0)     // 11
+
+    (0 0 0.1)                                        // 12
+    ({{ obstacle.x_min }} 0 0.1)                     // 13
+    ({{ obstacle.x_max }} 0 0.1)                     // 14
+    ({{ domain.width }} 0 0.1)                       // 15
+    (0 {{ obstacle.height }} 0.1)                    // 16
+    ({{ obstacle.x_min }} {{ obstacle.height }} 0.1) // 17
+    ({{ obstacle.x_max }} {{ obstacle.height }} 0.1) // 18
+    ({{ domain.width }} {{ obstacle.height }} 0.1)   // 19
+    (0 {{ domain.height }} 0.1)                      // 20
+    ({{ obstacle.x_min }} {{ domain.height }} 0.1)   // 21
+    ({{ obstacle.x_max }} {{ domain.height }} 0.1)   // 22
+    ({{ domain.width }} {{ domain.height }} 0.1)     // 23
+);
+
+
+// Grading
+h1 {{ grading.h1_cells }};
+h2 {{ grading.h2_cells }};
+h3 {{ grading.h3_cells }};
+v1 {{ grading.v1_cells }};
+
+blocks
+(
+    hex (   0   1   5   4   12  13  17  16  )
+    ($h1 $v1 1 )
+    simpleGrading (1 1 1)
+
+    hex (   2   3   7   6   14  15  19  18  )
+    ($h3 $v1 1)
+    simpleGrading (1 1 1)
+
+    hex (   4   5   9   8   16  17  21  20  )
+    ($h1 $v1 1)
+    simpleGrading (1 1 1)
+
+    hex (   5   6   10  9   17  18  22  21  )
+    ($h2 $v1 1)
+    simpleGrading (1 1 1)
+
+    hex (   6   7   11  10  18  19  23  22  )
+    ($h3 $v1 1 )
+    simpleGrading (1 1 1)
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+            (  0   4   16  12  )
+            (  4   8   20  16  )
+        );
+    }
+    outlet
+    {
+        type patch;
+        faces
+        (
+            (   3   7   19  15  )
+            (   7   11  23  19  )
+        );
+    }
+    obstacle
+    {
+        type wall;
+        faces
+        (
+            (   1   5   17  13  )
+            (   5   6   18  17  )
+            (   6   2   14  18  )
+        );
+    }
+    upperWall
+    {
+        type wall;
+        faces
+        (
+            (   8   9   21  20  )
+            (   9   10  22  21  )
+            (   10  11  23  22  )
+        );
+    }
+    lowerWall
+    {
+        type wall;
+        faces
+        (
+            (   0   1   13  12  )
+            (   2   3   15  14  )
+        );
+    }
+    frontAndBack
+    {
+        type empty;
+        faces
+        (
+            (   0   1   5   4   )
+            (   2   3   7   6   )
+            (   4   5   9   8   )
+            (   5   6   10  9   )
+            (   6   7   11  10  )
+            (   12  13  17  16  )
+            (   14  15  19  18  )
+            (   16  17  21  20  )
+            (   17  18  22  21  )
+            (   18  19  23  22  )
+        );
+    }
+);

@@ -1,0 +1,55 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      preciceDict;
+}
+
+preciceConfig "../2d/precice-config.xml";
+
+participant Solver;
+
+modules (GENERAL);
+
+interfaces
+{
+  Internal-Mesh
+  {
+    mesh              Solver-Mesh-2D-Internal;
+    patches           ();
+    locations         volumeCenters;
+    
+    readData
+    {
+    };
+
+    writeData
+    {
+      Data_2D
+      {
+        solver_name U;
+      };
+    };
+  };
+  
+  Boundary-Mesh
+  {
+    mesh              Solver-Mesh-2D-Boundaries;
+    patches           (inlet outlet upperWall lowerWall obstacle);
+    locations         faceCenters;
+    
+    readData
+    {
+    };
+
+    writeData
+    {
+      Data_2D
+      {
+        solver_name U;
+      };
+    };
+  };
+};
