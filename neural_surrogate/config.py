@@ -1,6 +1,6 @@
 
 # Data and paths
-DATA_DIR = "/home/dan/Desktop/neural-adapter/precice_datagen/datagen/128_grid"
+DATA_DIR = "data/solver-nutils/128_grid"
 MODEL_PATH = None
 
 # Model architecture

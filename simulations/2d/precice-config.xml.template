@@ -29,12 +29,12 @@
     <export:vtu directory="vtu" />
   </participant>
 
-  <m2n:sockets acceptor="Solver" connector="DataGenerator" exchange-directory=".."/>
+  <m2n:sockets exchange-directory="{{ precice_exchange_dir }}" acceptor="Solver" connector="DataGenerator" />
 
   <coupling-scheme:serial-explicit>
     <participants first="Solver" second="DataGenerator" />
-    <time-window-size value="0.1" />
-    <max-time-windows value="10" />
+    <time-window-size value="0.01" />
+    <max-time value="5.0" />
     <exchange data="Data_2D" mesh="Solver-Mesh-2D-Internal" from="Solver" to="DataGenerator" initialize="yes" />
     <exchange data="Data_2D" mesh="Solver-Mesh-2D-Boundaries" from="Solver" to="DataGenerator" initialize="yes" />
   </coupling-scheme:serial-explicit>

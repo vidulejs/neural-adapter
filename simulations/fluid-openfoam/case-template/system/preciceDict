@@ -7,7 +7,7 @@ FoamFile
     object      preciceDict;
 }
 
-preciceConfig "../2d/precice-config.xml";
+preciceConfig "precice-config.xml";
 
 participant Solver;
 

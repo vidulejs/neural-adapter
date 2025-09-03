@@ -14,13 +14,13 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         10;
+endTime         {{ simulation_control.endTime }};
 
-deltaT          0.005;
+deltaT          {{ simulation_control.deltaT }};
 
-writeControl    runTime;
+writeControl    none;
 
-writeInterval   0.1;
+writeInterval   {{ simulation_control.writeInterval }};
 
 purgeWrite      0;
 

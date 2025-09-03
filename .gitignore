@@ -24,4 +24,6 @@ simulations/.transport-openfoam/
 .ipynb_checkpoints/
 *.bak
 neural_surrogate/models/
+simulations/*/runs
+simulations/*/param_sets
 *.md
