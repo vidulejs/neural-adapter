@@ -17,12 +17,16 @@ class DataGenerator:
             
         with open(param_file, 'r') as f:
             self.params = yaml.safe_load(f)
-
+        
+        print("--- DATAGEN PARTICIPANT ---")
+        print(f"Using parameters: {json.dumps(self.params, indent=2)}")
+        print("---------------------------")
 
         config_path = os.path.abspath(self.config_file)
         self.participant = precice.Participant("DataGenerator", config_path, 0, 1)
 
         self.setup_mesh()
+        self.current_time = 0.0
 
     def setup_mesh(self):
         self.solver_mesh_internal_name = "Solver-Mesh-2D-Internal"
@@ -60,33 +64,38 @@ class DataGenerator:
         while self.participant.is_coupling_ongoing():
             self.participant.advance(dt)
             self.read_data()
+            self.current_time += dt
 
         self.participant.finalize()
         self.save_data()
 
     def read_data(self):
+        print(f"DATAGEN: Reading data at simulation time {self.current_time:.4f}...")
         internal_read_values = self.participant.read_data(self.solver_mesh_internal_name, self.data_name, self.internal_vertex_ids, 0.0)
         self.data[self.solver_mesh_internal_name].append(internal_read_values)
         boundary_read_values = self.participant.read_data(self.solver_mesh_boundaries_name, self.data_name, self.boundary_vertex_ids, 0.0)
         self.data[self.solver_mesh_boundaries_name].append(boundary_read_values)
 
     def save_data(self):
-        output_file = f"flow_data_epoch_{self.epoch}.npz"
-        output_path = os.path.join(args.output_path, output_file)
-        os.makedirs(args.output_path, exist_ok=True)
+        output_path = os.path.abspath(args.output_path)
+        # Ensure the directory for the output file exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         # Convert lists to numpy arrays for saving
         self.data[self.solver_mesh_internal_name] = np.array(self.data[self.solver_mesh_internal_name])
         self.data[self.solver_mesh_boundaries_name] = np.array(self.data[self.solver_mesh_boundaries_name])
+        
+        # Add the case parameters to the output file as a JSON string
+        self.data['parameters'] = json.dumps(self.params)
             
         np.savez(output_path, **self.data)
-        print(f"Data for epoch {self.epoch} saved to {output_path}")
+        print(f"Data saved to {output_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epoch", type=int, default=0, help="Current epoch number")
     parser.add_argument("--config", type=str, default="precice-config.xml", help="preCICE configuration file")
-    parser.add_argument("--output-path", type=str, default=".", help="Directory to save the generated data")
+    parser.add_argument("--output-path", type=str, required=True, help="Full path to save the output .npz file.")
     parser.add_argument("--params", type=str, required=True, help="Path to the YAML parameter file for this run.")
     args = parser.parse_args()
 

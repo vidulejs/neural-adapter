@@ -6,7 +6,7 @@ import argparse
 import sys
 import stat
 
-def generate_case(param_file, output_dir, template_dir='case-template', precice_config_file='../2d/precice-config.xml'):
+def generate_case(param_file, output_dir, template_dir='case-template', precice_config_file='../2d/precice-config.xml.template'):
     """
     Generates a complete, runnable OpenFOAM case from a parameter file.
     """
@@ -19,6 +19,9 @@ def generate_case(param_file, output_dir, template_dir='case-template', precice_
     output_dir_abs = os.path.abspath(output_dir)
     template_dir_abs = os.path.join(script_dir, template_dir)
     precice_config_src_abs = os.path.join(script_dir, precice_config_file)
+    
+    # Define the absolute path for the shared preCICE exchange directory
+    precice_exchange_dir_abs = os.path.abspath(os.path.join(script_dir, '..'))
 
     print(f"Reading parameters from: {param_file_abs}")
 
@@ -30,11 +33,14 @@ def generate_case(param_file, output_dir, template_dir='case-template', precice_
         print(f"ERROR: Could not read or parse YAML file {param_file_abs}: {e}", file=sys.stderr)
         sys.exit(1)
 
+    # Calculate the relative path from the output dir to the precice exchange dir
+    params['precice_exchange_dir'] = os.path.relpath(precice_exchange_dir_abs, output_dir_abs)
+
     print(f"Using template directory: {template_dir_abs}")
     print(f"Writing case to: {output_dir_abs}")
 
     # Set up Jinja2 environment
-    env = Environment(loader=FileSystemLoader(template_dir_abs), trim_blocks=True, lstrip_blocks=True)
+    env = Environment(loader=FileSystemLoader([template_dir_abs, os.path.dirname(precice_config_src_abs)]), trim_blocks=True, lstrip_blocks=True)
 
     # Walk through the template directory and copy/render files
     for root, dirs, files in os.walk(template_dir_abs):
@@ -55,10 +61,13 @@ def generate_case(param_file, output_dir, template_dir='case-template', precice_
             else:
                 shutil.copy2(template_path, output_path)
 
-    # Copy the preCICE configuration file into the case's system directory
+    # Render and copy the preCICE configuration file
     precice_config_dest = os.path.join(output_dir_abs, 'precice-config.xml')
-    print(f"Copying preCICE config from {precice_config_src_abs} to {precice_config_dest}")
-    shutil.copy2(precice_config_src_abs, precice_config_dest)
+    print(f"Rendering preCICE config to {precice_config_dest}")
+    precice_template = env.get_template(os.path.basename(precice_config_file))
+    rendered_precice_config = precice_template.render(params)
+    with open(precice_config_dest, 'w') as f:
+        f.write(rendered_precice_config)
     
     print(f"--- Case generation complete for: {output_dir_abs} ---")
 

@@ -1,31 +1,33 @@
 #!/bin/bash
-# Usage: ./run_2d.sh <path_to_precice_config> <output_path_for_npz>
+#
+# This script runs the Python datagen participant for a single case.
+# It expects to be run from the corresponding case directory in simulations/fluid-openfoam/runs/
+#
 
 set -e
 
-echo "--- Starting Datagen Participant (2D) ---"
+# --- Path Setup ---
+RUN_DIR=$(pwd)
+# SCRIPT_DIR is the absolute path to the directory where this script is located.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+PROJECT_ROOT=$(realpath "$SCRIPT_DIR/../..")
 
-# Check for correct number of arguments
+# --- Configuration ---
+PYTHON_EXEC="python3"
+DATAGEN_SCRIPT="$SCRIPT_DIR/datagen_2d.py"
+
+# --- Argument Parsing ---
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <path_to_precice_config> <output_path_for_npz>"
+    echo "Usage: $0 <path_to_param_file> <output_path_for_npz>"
     exit 1
 fi
 
-CONFIG_FILE=$1
-OUTPUT_PATH=$2
-EPOCH_NUM=0
+PARAM_FILE=$1
+NPZ_OUTPUT_PATH=$2
 
-cd "$(dirname "$0")"
+# --- Main ---
+echo "DATAGEN: Starting for case in $(basename "$RUN_DIR")"
 
-echo "Using preCICE config: $CONFIG_FILE"
-echo "Saving data to: $OUTPUT_PATH"
+$PYTHON_EXEC "$DATAGEN_SCRIPT" --params "$PARAM_FILE" --output-path "$NPZ_OUTPUT_PATH"
 
-timeout 180s /home/dan/venvs/torch/bin/python3 datagen_2d.py --config "$CONFIG_FILE" --epoch $EPOCH_NUM --output-path "$OUTPUT_PATH"
-
-# Check the exit code of the python script
-if [ $? -eq 124 ]; then
-    echo "Datagen participant timed out after 180 seconds."
-    exit 124
-fi
-
-echo "--- Datagen Participant Finished ---"
+echo "DATAGEN: Finished."
