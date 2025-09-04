@@ -94,3 +94,106 @@ class CNN_RES(nn.Module):
         out = self.res_blocks(out)
         out = self.conv_out(out)
         return self.remove_channel(out)
+    
+
+class DoubleConv(nn.Module):
+    """A helper block : (Conv2D -> BN -> ReLU) * 2"""
+    def __init__(self, in_channels, out_channels, mid_channels=None):
+        super().__init__()
+        if not mid_channels:
+            mid_channels = out_channels
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.double_conv(x)
+
+class UNet(nn.Module):
+    """
+    A standard U-Net architecture for image-to-image tasks.
+    It takes an input tensor and produces an output tensor of the same spatial dimensions.
+    """
+    def __init__(self, in_channels, out_channels):
+        super(UNet, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        # Encoder (Downsampling Path)
+        self.inc = DoubleConv(in_channels, 64)
+        self.down1 = DoubleConv(64, 128)
+        self.down2 = DoubleConv(128, 256)
+        self.down3 = DoubleConv(256, 512)
+        
+        self.pool = nn.MaxPool2d(2)
+
+        # Decoder (Upsampling Path)
+        self.up1 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.conv1 = DoubleConv(512, 256)
+        self.up2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
+        self.conv2 = DoubleConv(256, 128)
+        self.up3 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
+        self.conv3 = DoubleConv(128, 64)
+
+        # Final output convolution
+        self.outc = nn.Conv2d(64, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        # Encoder
+        x1 = self.inc(x)
+        x2 = self.down1(self.pool(x1))
+        x3 = self.down2(self.pool(x2))
+        x4 = self.down3(self.pool(x3))
+
+        # Decoder with skip connections
+        x = self.up1(x4)
+        x = torch.cat([x3, x], dim=1) # Concatenate along channel dimension
+        x = self.conv1(x)
+
+        x = self.up2(x)
+        x = torch.cat([x2, x], dim=1)
+        x = self.conv2(x)
+
+        x = self.up3(x)
+        x = torch.cat([x1, x], dim=1)
+        x = self.conv3(x)
+        
+        logits = self.outc(x)
+        return logits
+
+class ResidualUNet(nn.Module):
+    def __init__(self, in_channels=9, field_channels=2):
+        """
+        Args:
+            in_channels (int): Total number of input channels (fields + parameters).
+            field_channels (int): Number of channels for which to predict a residual (e.g., velocity field no boundaries).
+        """
+        super().__init__()
+        self.in_channels = in_channels
+        self.field_channels = field_channels
+
+        # It takes all channels as input but outputs only the field residuals.
+        self.unet_backbone = UNet(in_channels=in_channels, out_channels=field_channels)
+
+    def forward(self, x):
+        """
+        x: The input tensor representing State_t, with shape (N, C, H, W)
+        """
+        pred_residual = self.unet_backbone(x)
+
+        # Separate the original input
+        input_fields = x[:, :self.field_channels, :, :]   # first n channels
+        input_params = x[:, self.field_channels:, :, :]    # remaining channels
+
+        # Residual identity: next_field = current_field + residual
+        pred_next = input_fields + pred_residual
+
+        # Re-attach the unchanged parameter channels to form the full next state
+        pred_next_full = torch.cat([pred_next, input_params], dim=1)
+        
+        return pred_next_full
