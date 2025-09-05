@@ -18,9 +18,11 @@ def generate_parameter_sets(start_case_num, num_cases_to_generate):
     heights = np.arange(2.0, 6.0, 0.5, dtype=float)
     domain_options = [{'width': w, 'height': h} for w in widths for h in heights]
 
-    v_cells_obstacle_fractions = [0.25, 0.375, 0.5, 0.625]
-    h_cells_obstacle_fractions = [0.125, 0.1875, 0.25]
-    h_cells_pre_obstacle_fractions = [0.25, 0.375, 0.5]
+    v_cells_obstacle_fractions = np.linspace(0.25, 0.75, num=20, dtype=float)
+    min_h_frac = 4 / TOTAL_H_CELLS
+    h_cells_obstacle_fractions = np.linspace(min_h_frac, 0.5, num=20, dtype=float)
+    h_cells_pre_obstacle_fractions = np.linspace(0.2, 0.8, num=20, dtype=float)
+
     inlet_velocity_options = np.arange(0.1, 10, 0.1, dtype=float)
 
     # from 1e-5 to 1e-1
@@ -82,6 +84,7 @@ def generate_parameter_sets(start_case_num, num_cases_to_generate):
             'domain': {
                 'x_min': 0.0, 'y_min': 0.0,
                 'width': float(DOMAIN_WIDTH), 'height': float(DOMAIN_HEIGHT),
+                'h_cells': TOTAL_H_CELLS, 'v_cells': TOTAL_V_CELLS
             },
             'obstacle': {
                 'x_min': float(round(obstacle_x_min, 6)),
@@ -127,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--num-cases',
         type=int,
-        default=50,
+        default=100,
         help='The total number of new cases to generate.'
     )
     args = parser.parse_args()

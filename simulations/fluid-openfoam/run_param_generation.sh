@@ -5,9 +5,9 @@
 
 set -e
 
-START_NUM=50
+START_NUM=100
 
-NUM_CASES=50
+NUM_CASES=100
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PYTHON_SCRIPT="$SCRIPT_DIR/generate_paramsets.py"
