@@ -1,7 +1,14 @@
 
 # Data and paths
+
+import os
+
+
+_SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_PATH, os.pardir))
+
 DATA_DIR = "data/solver-nutils/128_grid"
-MODEL_PATH = None
+DATA_DIR = os.path.join(PROJECT_ROOT, DATA_DIR)
 
 # Model architecture
 INPUT_SIZE = 128

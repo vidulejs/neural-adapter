@@ -1,6 +1,6 @@
 {
   "datagen": {
-    "1d_resolution": [256],
+    "1d_resolution": [128],
     "2d_bounding_box": [0.0, 6.0, 0.0, 2.0],
     "epochs": 100,
     "initial_conditions": {
@@ -10,7 +10,7 @@
     }
   },
   "solver": {
-    "1d_resolution": [256],
+    "1d_resolution": [128],
     "1d_domain_min": [0.0, 0.0],
     "1d_domain_max": [2.0, 0.0],
     "2d_resolution": [60, 40],

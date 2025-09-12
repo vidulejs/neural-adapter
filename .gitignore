@@ -26,4 +26,5 @@ simulations/.transport-openfoam/
 neural_surrogate/models/
 simulations/*/runs
 simulations/*/param_sets
+neural_surrogate/animation
 *.md

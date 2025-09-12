@@ -51,51 +51,61 @@ class MLP_RES(nn.Module):
         return out
 
 class ResidualBlock1D(nn.Module):
-    """A standard 1D residual block."""
+    """A residual block that uses unpadded convolutions and crops the identity."""
     def __init__(self, channels, kernel_size=3):
         super(ResidualBlock1D, self).__init__()
-        padding = (kernel_size - 1) // 2
-        self.conv1 = nn.Conv1d(channels, channels, kernel_size, padding=padding, bias=False)
+        self.conv1 = nn.Conv1d(channels, channels, kernel_size, padding=0, bias=False)
         self.bn1 = nn.BatchNorm1d(channels)
-        self.conv2 = nn.Conv1d(channels, channels, kernel_size, padding=padding, bias=False)
+        self.conv2 = nn.Conv1d(channels, channels, kernel_size, padding=0, bias=False)
         self.bn2 = nn.BatchNorm1d(channels)
 
     def forward(self, x):
         identity = x
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
-        out += identity # Residual connection
+        
+        crop_amount = (identity.shape[2] - out.shape[2]) // 2
+        if crop_amount > 0:
+            identity = identity[:, :, crop_amount:-crop_amount]
+        
+        out += identity
         return F.relu(out)
 
 class CNN_RES(nn.Module):
-
+    """The main model. It now handles internal padding."""
     def __init__(self, hidden_channels, num_blocks=2, kernel_size=3):
         super(CNN_RES, self).__init__()
-        # Input layer: maps 1 input channel to hidden_channels
+        self.hidden_channels = hidden_channels
+        self.num_blocks = num_blocks
+        self.kernel_size = kernel_size
+        
         self.conv_in = nn.Conv1d(1, hidden_channels, kernel_size=1, bias=False)
         self.bn_in = nn.BatchNorm1d(hidden_channels)
         
-        # A sequence of residual blocks operating on hidden_channels
         layers = [ResidualBlock1D(hidden_channels, kernel_size) for _ in range(num_blocks)]
         self.res_blocks = nn.Sequential(*layers)
         
-        # Output layer: maps hidden_channels back to 1 output channel
         self.conv_out = nn.Conv1d(hidden_channels, 1, kernel_size=1)
-
-    def add_input_channel(self, x):
-        return x.unsqueeze(1)
     
-    def remove_channel(self, x):
-        return x.squeeze(1)
-
     def forward(self, x):
-        out = self.add_input_channel(x)
-        out = F.relu(self.bn_in(self.conv_in(out)))
+        if x.dim() == 2:
+            x = x.unsqueeze(1) # Add channel dim: (B, 1, L)
+
+        total_pad_per_side = self.num_blocks * (self.kernel_size - 1)
+        
+        internal_pad_per_side = total_pad_per_side - 1
+        
+        if internal_pad_per_side > 0:
+            x_padded = F.pad(x, (internal_pad_per_side, internal_pad_per_side), mode='replicate')
+        else:
+            x_padded = x
+
+        out = F.relu(self.bn_in(self.conv_in(x_padded)))
         out = self.res_blocks(out)
         out = self.conv_out(out)
-        return self.remove_channel(out)
+        
+        return out.squeeze(1) # Remove channel dim: (B, L_final)
     
-
 class DoubleConv(nn.Module):
     """A helper block : (Conv2D -> BN -> ReLU) * 2"""
     def __init__(self, in_channels, out_channels, mid_channels=None):
