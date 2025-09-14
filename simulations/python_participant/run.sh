@@ -22,5 +22,5 @@ echo "Saving data to: $output_path"
 for (( i=$start_epoch; i<$end_epoch; i++ ))
 do
    echo "--- Starting Datagen Epoch $i ---"
-   timeout 90s python3 datagen.py $1 --epoch $i --output-path "$output_path" || if [ $? -eq 124 ]; then echo "Datagen for epoch $i timed out. Continuing to next epoch."; else exit $?; fi
+   timeout 40s python3 datagen.py $1 --epoch $i --output-path "$output_path" || if [ $? -eq 124 ]; then echo "Datagen for epoch $i timed out. Continuing to next epoch."; else exit $?; fi
 done

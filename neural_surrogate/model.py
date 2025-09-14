@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def pad_with_ghost_cells(input_seq, bc_left, bc_right):
+    return torch.cat([bc_left, input_seq, bc_right], dim=1)
+
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(MLP, self).__init__()
@@ -22,6 +25,13 @@ class MLP_RES(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
+        if output_size == input_size - 2:
+            print("Assuming ghost cells")
+            #assuming ghost cells are included in input_size
+            self.ghost_cells = True
+            self.output_size = self.input_size
+            output_size = self.input_size
+        
         
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
@@ -47,6 +57,9 @@ class MLP_RES(nn.Module):
         
         out = self.fc3(out)
         out = out + input
+
+        if self.ghost_cells:
+            out = out[:, 1:-1] # remove ghost cells
 
         return out
 

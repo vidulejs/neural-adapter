@@ -7,5 +7,5 @@ epochs=$(python3 -c "import json; print(json.load(open('../python_participant/co
 for (( i=0; i<epochs; i++ ))
 do
    echo "--- Starting Solver Epoch $i ---"
-   timeout 40s python3 solver.py $1 --epoch $i --config_file "precice-config.xml" || if [ $? -eq 124 ]; then echo "Solver for epoch $i timed out. Continuing to next epoch."; fi
+   python3 solver.py $1 --epoch $i
 done

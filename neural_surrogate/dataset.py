@@ -20,7 +20,7 @@ class BurgersDatasetBPTT(Dataset):
     def _load_data(self):
         for file_path in self.file_paths:
             data = np.load(file_path)
-            time_series = data['DataGenerator-Mesh-1D-Internal']
+            time_series = data['Solver-Mesh-1D-Internal']
             stride = self.unroll_steps // 2
 
             if self.unroll_steps == -1:  # full sequence
@@ -46,7 +46,7 @@ class BurgersDataset(Dataset):
     def _load_data(self):
         for file_path in self.file_paths:
             data = np.load(file_path)
-            time_series = data['DataGenerator-Mesh-1D-Internal']
+            time_series = data['Solver-Mesh-1D-Internal']
             for i in range(time_series.shape[0] - 1):
                 self.data.append((time_series[i], time_series[i+1]))
 

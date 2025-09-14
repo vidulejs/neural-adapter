@@ -66,6 +66,3 @@ def clear_memory():
         except Exception:
             pass
     print(f"Remaining live CUDA tensors: {live_cuda}")
-
-def pad_with_ghost_cells(input_seq, bc_left, bc_right):
-    return torch.cat([bc_left, input_seq, bc_right], dim=1)
