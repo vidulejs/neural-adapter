@@ -2,7 +2,7 @@
   "datagen": {
     "1d_resolution": [128],
     "2d_bounding_box": [0.0, 6.0, 0.0, 2.0],
-    "epochs": 3
+    "epochs": 200
   },
   "solver": {
     "1d_resolution": [128],

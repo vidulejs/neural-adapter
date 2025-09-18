@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 # Set the starting epoch number here. This can be overridden by the START_EPOCH env var.
 : "${start_epoch:=0}"
 # The output path is now the second argument to the script, defaulting to "."
-output_path="${2:-.}"
+output_path="${2:-./data}"
 # -------------------
 
 # Get the number of epochs to generate for this run

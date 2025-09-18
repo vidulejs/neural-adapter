@@ -1,24 +1,23 @@
-
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../", "data", "solver-nutils"))
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../", "data"))
 
-data_dir_dgalerkin = os.path.join(DATA_DIR)
-data_dir_diffuse = os.path.join(DATA_DIR, "diffuse")
+data_dir_dgalerkin = os.path.join(DATA_DIR, "solver-nutils")
+data_dir_diffuse = os.path.join(DATA_DIR, "solver-burgers")
 
-files_dgalerkin = os.listdir(data_dir_dgalerkin)
-files_dgalerkin = [os.path.join(data_dir_dgalerkin, f) for f in files_dgalerkin if f.endswith(".npz")]
-files_diffuse = os.listdir(data_dir_diffuse)
-files_diffuse = [os.path.join(data_dir_diffuse, f) for f in files_diffuse if f.endswith(".npz")]
+# file names are the same, folders are different
+files_ = os.listdir(data_dir_dgalerkin)
+files_ = sorted(f for f in files_ if f.endswith(".npz"))
 
 
-file_num = 1
+file_num = 30
 timestep = 0
 
-file_dgalerkin = files_dgalerkin[file_num]
-file_diffuse = files_diffuse[file_num]
+file_dgalerkin = os.path.join(data_dir_dgalerkin, files_[file_num])
+file_diffuse = os.path.join(data_dir_diffuse, files_[file_num])
+
 data_dgalerkin = np.load(file_dgalerkin)["Solver-Mesh-1D-Internal"]
 data_diffuse = np.load(file_diffuse)["Solver-Mesh-1D-Internal"]
 

@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  v2212
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      preciceDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+preciceConfig "../precice-config.xml";
+
+participant Transport;
+
+modules (GENERAL);
+
+interfaces
+{
+  Interface1
+  {
+    mesh              Transport-Mesh;
+    patches           ();
+    cellSets          ();
+    locations         volumeCenters;
+    
+    readData
+    {
+      Velocity
+      {
+        solver_name U;
+      };
+    };
+    
+    writeData
+    {
+    };
+  };
+};
+
+
+// ************************************************************************* //

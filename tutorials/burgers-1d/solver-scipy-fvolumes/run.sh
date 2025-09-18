@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Get the number of epochs from config.json
 cd "$(dirname "$0")"

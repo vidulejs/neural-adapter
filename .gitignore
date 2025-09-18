@@ -18,13 +18,19 @@
 
 # Generated data and simulation runs
 /data/
-simulations/.transport-openfoam/
 
 # Other
 .ipynb_checkpoints/
 *.bak
 neural_surrogate/models/
-simulations/*/runs
-simulations/*/param_sets
+tutorials/*/runs
+tutorials/*param_sets
 neural_surrogate/animation
 *.md
+
+neural_surrogate/rollout_comparison.png
+neural_surrogate/rollout_comparison.svg
+
+data-training
+tutorials/channel-transport/fluid-openfoam.template/runs/*/*
+tutorials/channel-transport/fluid-openfoam.template/param_sets/*.yml
