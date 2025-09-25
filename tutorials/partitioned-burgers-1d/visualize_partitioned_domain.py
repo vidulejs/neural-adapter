@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-TIMESTEP_TO_PLOT = 25 #eg. 0, 1, ..., 100, ... ,-1
+TIMESTEP_TO_PLOT = 25 #eg. 0, 1, ..., n, ... ,-1
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
 NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "neumann-scipy", "neumann.npz")
+# NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "surrogate-burgers", "surrogate.npz")
 
 print(f"Loading data from {DIRICHLET_DATA_PATH}")
 data_d = np.load(DIRICHLET_DATA_PATH)

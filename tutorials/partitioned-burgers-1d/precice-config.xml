@@ -38,7 +38,7 @@
   <coupling-scheme:serial-implicit>
     <participants first="Dirichlet" second="Neumann" />
     <max-time value="1.0" />
-    <time-window-size value="0.025" />
+    <time-window-size value="0.01" />
     <max-iterations value="10" />
     <exchange data="Flux" mesh="Dirichlet-Mesh" from="Dirichlet" to="Neumann" initialize="true" substeps="false" />
     <exchange data="Velocity" mesh="Neumann-Mesh" from="Neumann" to="Dirichlet" initialize="true" substeps="false" />
