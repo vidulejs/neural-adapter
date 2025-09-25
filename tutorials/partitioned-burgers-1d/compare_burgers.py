@@ -2,17 +2,17 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../", "data"))
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__)))
 
-data_dir_dgalerkin = os.path.join(DATA_DIR, "solver-nutils")
-data_dir_diffuse = os.path.join(DATA_DIR, "solver-burgers")
+data_dir_dgalerkin = os.path.join(DATA_DIR, "solver-nutils-dgalerkin", "data-training")
+data_dir_diffuse = os.path.join(DATA_DIR, "solver-scipy-fvolumes", "data-training")
 
 # file names are the same, folders are different
 files_ = os.listdir(data_dir_dgalerkin)
 files_ = sorted(f for f in files_ if f.endswith(".npz"))
 
 
-file_num = 30
+file_num = 0
 timestep = 0
 
 file_dgalerkin = os.path.join(data_dir_dgalerkin, files_[file_num])
@@ -31,6 +31,7 @@ plt.title(f'Comparison at Timestep {timestep}')
 plt.xlabel('Spatial Position')
 plt.ylabel('Solution Value')
 plt.legend()
+plt.savefig(os.path.join(DATA_DIR, f'comparison_timestep_{timestep}.png'))
 
 # plot the imshow with unified colormap
 vmin = min(data_dgalerkin.min(), data_diffuse.min())

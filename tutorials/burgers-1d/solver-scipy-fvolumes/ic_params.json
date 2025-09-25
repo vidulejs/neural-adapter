@@ -1,7 +1,0 @@
-{
-  "initial_conditions": {
-    "type": "sinusoidal",
-    "wavenumber_range": [1, 7],
-    "num_modes": 4
-  }
-}
