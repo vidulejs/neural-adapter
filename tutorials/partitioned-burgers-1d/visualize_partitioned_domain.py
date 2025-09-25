@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-TIMESTEP_TO_PLOT = 100 #eg. 0, 1, ..., 100, ... ,-1
+TIMESTEP_TO_PLOT = 25 #eg. 0, 1, ..., 100, ... ,-1
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
@@ -44,5 +44,4 @@ plt.ylabel('Spatial Coordinate (x)')
 plt.tight_layout()
 plt.savefig(os.path.join(CASE_DIR, 'full_domain_evolution.png'))
 print("Saved plot to full_domain_evolution.png")
-
-plt.show()
+plt.close()
