@@ -108,61 +108,75 @@ def main(participant_name: str):
 
     solution_history = {0.0: u.copy()}
 
-    participant.initialize()
+    if participant.requires_initial_data():
+        if participant_name == "Dirichlet":
+            du_dx = (u[-1] - u[-2]) / dx
+            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx])
+        else: # Neumann
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
 
+    participant.initialize()
 
     dt = participant.get_max_time_step_size()
     t = 0.0
+    saved_t = 0.0
     C_viscosity = 1e-12
 
-    while participant.is_coupling_ongoing():
-        if participant.requires_writing_checkpoint():
-            saved_u = u.copy()
+    # --- Serial Coupling Loop ---
+    if participant_name == "Dirichlet":
+        while participant.is_coupling_ongoing():
+            if participant.requires_writing_checkpoint():
+                print(f"[Dirichlet] Writing checkpoint at t={t:.4f}")
+                saved_u = u.copy()
+                saved_t = t
+            if participant.requires_reading_checkpoint():
+                u = saved_u.copy()
+                t = saved_t
+                print(f"[Dirichlet] Reading checkpoint at t={t:.4f}")
 
-        # --- Read data and set BCs --- 
-        if t > 0:
-            if participant_name == "Dirichlet":
-                bc_right = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
-                print(f"[Dirichlet @ t={t:.2f}] Read bc_right = {bc_right:.4f}")
-            else: # Neumann
-                du_dx_bc = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
-                print(f"[Neumann   @ t={t:.2f}] Read du/dx = {du_dx_bc:.4f}")
-        else: # First timestep
-            if participant_name == "Dirichlet":
-                bc_right = full_ic[nelems_local]
-                print(f"[Dirichlet @ t=0.00] Using initial bc_right = {bc_right:.4f}")
-            else: # Neumann
-                du_dx_bc = (full_ic[nelems_local] - full_ic[nelems_local - 1]) / dx
-                print(f"[Neumann   @ t=0.00] Using initial du/dx = {du_dx_bc:.4f}")
-
-        if participant_name == "Dirichlet":
+            bc_right = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
             bc_left = 0
-        else: # Neumann
+            print(f"[Dirichlet] t={t:.4f}, value at interface: {u[-1]:.6f}, du_dx at interface: {(u[-1]-u[-2])/dx:.6f}, bc_right from Neumann: {bc_right:.6f}")
+
+            t_end = t + dt
+            solver_args = (dx, C_viscosity, bc_left, bc_right)
+            sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
+            u = sol.y[:, -1]
+            
+            du_dx = (u[-1] - u[-2]) / dx
+            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx])
+            
+            t = sol.t[-1]
+            solution_history[t] = u.copy()
+            participant.advance(dt)
+
+    else: # Neumann
+        while participant.is_coupling_ongoing():
+            if participant.requires_writing_checkpoint():
+                print(f"[Neumann] Writing checkpoint at t={t:.4f}")
+                saved_u = u.copy()
+                saved_t = t
+            if participant.requires_reading_checkpoint():
+                u = saved_u.copy()
+                t = saved_t
+                print(f"[Neumann] Reading checkpoint at t={t:.4f}")
+                
+
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
+            du_dx_bc = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
+            
             bc_left = u[0] - dx * du_dx_bc
             bc_right = 0
+            print(f"[Neumann] t={t:.4f}, value at interface: {u[0]:.6f}, du_dx at interface: {(u[1]-u[0])/dx:.6f}, du_dx at interface from Dirichlet: {du_dx_bc:.6f}")
 
-        # --- Solve one timestep ---
-        t_end = t + dt
-        solver_args = (dx, C_viscosity, bc_left, bc_right)
-        sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
+            t_end = t + dt
+            solver_args = (dx, C_viscosity, bc_left, bc_right)
+            sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
+            u = sol.y[:, -1]
 
-        u = sol.y[:, -1]
-        t = sol.t[-1]
-
-        solution_history[t] = u.copy()
-
-        # --- Write coupling data ---
-        if participant.is_coupling_ongoing():
-            if participant_name == "Dirichlet":
-                du_dx = (u[-1] - u[-2]) / dx
-                participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx])
-            else: # Neumann
-                participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
-
-        participant.advance(dt)
-
-        if participant.requires_reading_checkpoint():
-            u = saved_u.copy()
+            t = sol.t[-1]
+            solution_history[t] = u.copy()
+            participant.advance(dt)
 
     # Finalize and save data to npz array
     participant.finalize()

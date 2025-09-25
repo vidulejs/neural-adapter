@@ -38,15 +38,16 @@
   <coupling-scheme:serial-implicit>
     <participants first="Dirichlet" second="Neumann" />
     <max-time value="1.0" />
-    <time-window-size value="0.01" />
+    <time-window-size value="0.025" />
     <max-iterations value="10" />
-    <exchange data="Flux" mesh="Dirichlet-Mesh" from="Dirichlet" to="Neumann" initialize="false" substeps="true" />
-    <exchange data="Velocity" mesh="Neumann-Mesh" from="Neumann" to="Dirichlet" initialize="false" substeps="true" />
-    <relative-convergence-measure data="Flux" mesh="Dirichlet-Mesh" limit="1e-5" />
-    <relative-convergence-measure data="Velocity" mesh="Neumann-Mesh" limit="1e-5" />
-    <acceleration:constant>
-      <relaxation value="0.5" />
-    </acceleration:constant>
+    <exchange data="Flux" mesh="Dirichlet-Mesh" from="Dirichlet" to="Neumann" initialize="true" substeps="false" />
+    <exchange data="Velocity" mesh="Neumann-Mesh" from="Neumann" to="Dirichlet" initialize="true" substeps="false" />
+    <relative-convergence-measure data="Flux" mesh="Dirichlet-Mesh" limit="1e-7" />
+    <relative-convergence-measure data="Velocity" mesh="Neumann-Mesh" limit="1e-7" />
+    <acceleration:aitken>
+      <data name="Velocity" mesh="Neumann-Mesh" />
+      <initial-relaxation value="0.5" />
+    </acceleration:aitken>
   </coupling-scheme:serial-implicit>
 
 </precice-configuration>
