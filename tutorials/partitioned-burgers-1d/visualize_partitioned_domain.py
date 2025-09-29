@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-TIMESTEP_TO_PLOT = 3 #eg. 0, 1, ..., n, ... ,-1
+TIMESTEP_TO_PLOT = 5 #eg. 0, 1, ..., n, ... ,-1
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
@@ -41,7 +41,7 @@ if gt_exists:
     print(f"Ground truth shape: {solution_gt.shape}")
 
 # --- plot single timestep ---
-plt.figure(figsize=(10, 5))
+plt.figure(figsize=(10, 5), dpi=200)
 plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', linestyle='-', label='Partitioned domain')
 if gt_exists:
     plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='x', linestyle='--', alpha=0.5, c="red", label='Ground truth')
@@ -52,6 +52,27 @@ plt.grid(True)
 plt.legend()
 plt.savefig(os.path.join(CASE_DIR, f'full_domain_timestep_slice.png'))
 print(f"Saved plot to full_domain_timestep_slice.png")
+
+# --- plot gradient at single timestep ---
+solution_slice = full_solution_history[TIMESTEP_TO_PLOT, :]
+du_dx = np.gradient(solution_slice, full_coords)
+
+plt.figure(figsize=(10, 5), dpi=200)
+plt.plot(full_coords, du_dx, marker='.', linestyle='-', label='Partitioned domain')
+
+if gt_exists:
+    solution_gt_slice = solution_gt[TIMESTEP_TO_PLOT, :]
+    du_dx_gt = np.gradient(solution_gt_slice, coords_gt[:, 0])
+    plt.plot(coords_gt[:, 0], du_dx_gt, marker='x', linestyle='--', alpha=0.5, c="red", label='Ground truth')
+
+plt.title(f'Gradient (du/dx) at Timestep {TIMESTEP_TO_PLOT}')
+plt.xlabel('Spatial Coordinate (x)')
+plt.ylabel('Gradient Value (du/dx)')
+plt.grid(True)
+plt.legend()
+plt.savefig(os.path.join(CASE_DIR, f'gradient_timestep_slice.png'))
+print(f"Saved plot to gradient_timestep_slice.png")
+plt.close()
 
 # --- plot time evolution ---
 plt.figure(figsize=(10, 6))

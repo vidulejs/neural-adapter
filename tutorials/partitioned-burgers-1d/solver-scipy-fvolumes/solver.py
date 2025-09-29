@@ -4,10 +4,10 @@ The two participants:
 - 'Dirichlet': Solves the left half of the domain.
 - 'Neumann':   Solves the right half of the domain.
 
-# |<-----------------Dirichlet------------------>|<------------------Neumann-------------------->|
-# | bc_left = 0|  |  ...  |   | u[-1] | bc_right | bc_left | u[0] |   |  ...  |   | bc_right = 0 |
-# |<------------------ u ----------------------->|<------------------ u ------------------------>|
-# |                                         u_interface                                          |
+# |<-----------------Dirichlet-------------------->|<--------------------Neumann-------------------->|
+# | bc_left = 0|  |  ...  |   | u[-1] <|> bc_right | bc_left <|> u[0] |   |  ...  |   | bc_right = 0 |
+# |<------------------ u ------------------------->|<-------------------- u ------------------------>|
+# |                              <u_interface>     |    <u_interface>                                |
 """
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -21,6 +21,9 @@ import time
 def lax_friedrichs_flux(u_left, u_right): # Flux at cell interface between i-1/2 and i+1/2
     return 0.5 * (0.5 * u_left**2 + 0.5 * u_right**2) - 0.5 * (u_right - u_left)
 
+def flux_function(u_left, u_right):
+    return lax_friedrichs_flux(u_left, u_right)
+
 def burgers_rhs(t, u, dx, C, bc_left, bc_right):
     # Ghost cells for BCs
     u_padded = np.empty(len(u) + 2)
@@ -30,7 +33,7 @@ def burgers_rhs(t, u, dx, C, bc_left, bc_right):
 
     flux = np.empty(len(u) + 1)
     for i in range(len(flux)):
-        flux[i] = lax_friedrichs_flux(u_padded[i], u_padded[i+1])
+        flux[i] = flux_function(u_padded[i], u_padded[i+1])
 
     # viscosity
     viscosity = C * (u_padded[2:] - 2 * u_padded[1:-1] + u_padded[:-2]) / dx**2
@@ -91,13 +94,13 @@ def main(participant_name: str):
     if participant_name == "Dirichlet":
         mesh_name = "Dirichlet-Mesh"
         read_data_name = "Velocity"
-        write_data_name = "Flux"
+        write_data_name = "Gradient"
         local_domain_min = full_domain_min
         local_domain_max = full_domain_min + nelems_local * dx
         coupling_point = [[local_domain_max, 0.0]]
     elif participant_name == "Neumann":
         mesh_name = "Neumann-Mesh"
-        read_data_name = "Flux"
+        read_data_name = "Gradient"
         write_data_name = "Velocity"
         local_domain_min = full_domain_min + nelems_local * dx
         local_domain_max = full_domain_max
@@ -143,26 +146,25 @@ def main(participant_name: str):
                 t = saved_t
                 # print(f"[Dirichlet] Reading checkpoint at t={t:.4f}")
 
-            u_interface = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
+            u_from_neumann = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
 
-            bc_right = 2*u_interface - u[-1]
+            bc_right = u_from_neumann
 
             t_end = t + dt
             solver_args = (dx, C_viscosity, 0, bc_right)
             sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
             u = sol.y[:, -1]
+            # u = u + dt * burgers_rhs(t, u, *solver_args)
 
-            bc_right = 2*u_interface - u[-1] # Update BC to be consistent with the communicated interface value
 
-            du_dx_interface = (bc_right - u[-1]) / dx
-            u_interface = (bc_right + u[-1]) / 2
-            flux_across_interface = lax_friedrichs_flux(u[-1], bc_right)
+            gradient_to_send = (u_from_neumann - u[-1]) / dx
+            flux_across_interface = flux_function(u[-1], bc_right)
+     
+            participant.write_data(mesh_name, write_data_name, vertex_id, [gradient_to_send])
 
-            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx_interface])
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_from_neumann:8.4f} | grad_sent={gradient_to_send:8.4f} | flux_across={flux_across_interface:8.4f}")
 
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_interface={u_interface:8.4f} | du_dx_across={du_dx_interface:8.4f} | flux_across={flux_across_interface:8.4f}")
-
-            t = sol.t[-1]
+            t = saved_t + dt
             t_index = int(t/dt)
             solution_history[t_index] = u.copy()
             participant.advance(dt)
@@ -186,22 +188,22 @@ def main(participant_name: str):
             solver_args = (dx, C_viscosity, bc_left, 0)
             sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
             u = sol.y[:, -1]
+            # u = u + dt * burgers_rhs(t, u, *solver_args)
 
-            bc_left = u[0] - du_dx_recv * dx # Update BC to be consistent with the communicated interface value
-            u_interface = (bc_left + u[0]) / 2 
-            du_dx_interface = (u[0] - bc_left) / dx
-            flux_across_interface = lax_friedrichs_flux(bc_left, u[0])
 
-            if u_interface < 0 and t > 0:
-                print(f"[{participant_name}] Only upwind scheme implemented, aborting!")
-                aborted = True
-                break
+            bc_left = u[0] - du_dx_recv * dx # Update bc_left to be consistent with the new state
+            flux_across_interface = flux_function(bc_left, u[0])
 
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u_interface])
+            # if u[0] < 0 and t > 0:
+            #     print(f"[{participant_name}] Only upwind scheme implemented, aborting!")
+            #     aborted = True
+            #     break
 
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_interface={u_interface:8.4f} | du_dx_across={du_dx_interface:8.4f} | flux_across={flux_across_interface:8.4f}")
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
 
-            t = sol.t[-1]
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u[0]:8.4f} | grad_recv={du_dx_recv:8.4f} | flux_across={flux_across_interface:8.4f}")
+
+            t = saved_t + dt
             t_index = int(t/dt)
             solution_history[t_index] = u.copy()
             participant.advance(dt)
@@ -218,10 +220,11 @@ def main(participant_name: str):
         while t + dt < t_end:
             step_end = t + dt
             solver_args = (dx, C_viscosity, bc_left, bc_right)
-            sol = solve_ivp(burgers_rhs, (t, step_end), u, args=solver_args, method='BDF', t_eval=[step_end])
+            sol = solve_ivp(burgers_rhs, (t, step_end), u, args=solver_args, method='BDF', t_eval=[step_end], )
             u = sol.y[:, -1]
-
-            t = sol.t[-1]
+            # u = u + dt * burgers_rhs(t, u, *solver_args)
+            
+            t = t + dt
             t_index = int(t/dt)
             solution_history[t_index] = u.copy()
             print(f"[Standalone ] t={t:6.4f}")
