@@ -2,12 +2,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-TIMESTEP_TO_PLOT = 25 #eg. 0, 1, ..., n, ... ,-1
+TIMESTEP_TO_PLOT = 3 #eg. 0, 1, ..., n, ... ,-1
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
 NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "neumann-scipy", "neumann.npz")
 # NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "surrogate-burgers", "surrogate.npz")
+
+GROUND_TRUTH_DATA_PATH = os.path.join(CASE_DIR, "solver-scipy-fvolumes", "full_domain.npz")
+if os.path.exists(GROUND_TRUTH_DATA_PATH):
+    print(f"Found ground truth data at {GROUND_TRUTH_DATA_PATH}")
+    gt_exists = True
+else:
+    print(f"Ground truth data not found at {GROUND_TRUTH_DATA_PATH}.\nPlease run python3 solver-scipy-fvolumes/solver.py None.")
+    gt_exists = False
 
 print(f"Loading data from {DIRICHLET_DATA_PATH}")
 data_d = np.load(DIRICHLET_DATA_PATH)
@@ -24,15 +32,26 @@ full_solution_history = np.concatenate((solution_d, solution_n), axis=1)
 
 print(f"Full domain shape: {full_solution_history.shape}")
 
+if gt_exists:
+    print(f"Loading ground truth data from {GROUND_TRUTH_DATA_PATH}")
+    data_gt = np.load(GROUND_TRUTH_DATA_PATH)
+    coords_gt = data_gt['internal_coordinates']
+    solution_gt = data_gt['Solver-Mesh-1D-Internal']
+
+    print(f"Ground truth shape: {solution_gt.shape}")
+
 # --- plot single timestep ---
 plt.figure(figsize=(10, 5))
-plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', linestyle='-')
+plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', linestyle='-', label='Partitioned domain')
+if gt_exists:
+    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='x', linestyle='--', alpha=0.5, c="red", label='Ground truth')
 plt.title(f'Solution at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
 plt.ylabel('Solution Value (u)')
 plt.grid(True)
-plt.savefig(os.path.join(CASE_DIR, f'full_domain_timestep_{TIMESTEP_TO_PLOT}.png'))
-print(f"Saved plot to full_domain_timestep_{TIMESTEP_TO_PLOT}.png")
+plt.legend()
+plt.savefig(os.path.join(CASE_DIR, f'full_domain_timestep_slice.png'))
+print(f"Saved plot to full_domain_timestep_slice.png")
 
 # --- plot time evolution ---
 plt.figure(figsize=(10, 6))

@@ -4,8 +4,10 @@ The two participants:
 - 'Dirichlet': Solves the left half of the domain.
 - 'Neumann':   Solves the right half of the domain.
 
-# |<------- Dirichlet ------->|<------- Neumann ------->|
-# | u(0)=0                    |                   u(n)=0|
+# |<-----------------Dirichlet------------------>|<------------------Neumann-------------------->|
+# | bc_left = 0|  |  ...  |   | u[-1] | bc_right | bc_left | u[0] |   |  ...  |   | bc_right = 0 |
+# |<------------------ u ----------------------->|<------------------ u ------------------------>|
+# |                                         u_interface                                          |
 """
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -65,9 +67,15 @@ def burgers_rhs(t, u, dx, C, bc_left, bc_right):
 def main(participant_name: str):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     case_dir = os.path.abspath(os.path.join(script_dir, '..'))
+    run_dir = os.getcwd()
 
-    config_path = os.path.join(case_dir, "precice-config.xml")
-    participant = precice.Participant(participant_name, config_path, 0, 1)
+
+    if participant_name == 'None':
+        print("Participant not specified. Running full domain without preCICE")
+        participant_name = None
+    else:
+        config_path = os.path.join(case_dir, "precice-config.xml")
+        participant = precice.Participant(participant_name, config_path, 0, 1)
 
     # Read initial condition
     with open(os.path.join(case_dir, "ic_params.json"), 'r') as f:
@@ -94,24 +102,31 @@ def main(participant_name: str):
         local_domain_min = full_domain_min + nelems_local * dx
         local_domain_max = full_domain_max
         coupling_point = [[local_domain_min, 0.0]]
-    else:
-        raise ValueError(f"Unknown participant name: {participant_name}")
+    else: #full domain run
+        local_domain_min = full_domain_min
+        local_domain_max = full_domain_max
+        nelems_local = nelems_total
+        dt = 0.01 # Fixed time step for standalone run
+        t_end = 0.1
 
-    vertex_id = participant.set_mesh_vertices(mesh_name, coupling_point)
+    if participant_name is not None:
+        vertex_id = participant.set_mesh_vertices(mesh_name, coupling_point)
+        participant.initialize()
+        dt = participant.get_max_time_step_size()
 
     ic_data = np.load(os.path.join(case_dir, "initial_condition.npz"))
     full_ic = ic_data['initial_condition']
     if participant_name == "Dirichlet":
         u = full_ic[:nelems_local]
-    else:
+    elif participant_name == "Neumann":
         u = full_ic[nelems_local:]
+    else:
+        u = full_ic
 
-    solution_history = {0.0: u.copy()}
+    solution_history = {int(0): u.copy()}
 
-    participant.initialize()
-
-    dt = participant.get_max_time_step_size()
     t = 0.0
+    t_index = 0
     saved_t = 0.0
     C_viscosity = 1e-12
     aborted = False
@@ -148,10 +163,11 @@ def main(participant_name: str):
             print(f"[{participant_name:9s}] t={t:6.4f} | u_interface={u_interface:8.4f} | du_dx_across={du_dx_interface:8.4f} | flux_across={flux_across_interface:8.4f}")
 
             t = sol.t[-1]
-            solution_history[t] = u.copy()
+            t_index = int(t/dt)
+            solution_history[t_index] = u.copy()
             participant.advance(dt)
 
-    else: # Neumann
+    elif participant_name == "Neumann":
         while participant.is_coupling_ongoing():
             if participant.requires_writing_checkpoint():
                 # print(f"[Neumann] Writing checkpoint at t={t:.4f}")
@@ -186,34 +202,49 @@ def main(participant_name: str):
             print(f"[{participant_name:9s}] t={t:6.4f} | u_interface={u_interface:8.4f} | du_dx_across={du_dx_interface:8.4f} | flux_across={flux_across_interface:8.4f}")
 
             t = sol.t[-1]
-            solution_history[t] = u.copy()
+            t_index = int(t/dt)
+            solution_history[t_index] = u.copy()
             participant.advance(dt)
 
-    # Finalize and save data to npz array
-    participant.finalize()
+    if participant_name is not None:
+        # Finalize and save data to npz array
+        participant.finalize()
+        output_filename = os.path.join(run_dir, f"{participant_name.lower()}.npz")
+    else:
+        output_filename = os.path.join(script_dir, "full_domain.npz")
+        print("Starting standalone simulation without preCICE")
+        bc_left, bc_right = 0, 0
+
+        while t + dt < t_end:
+            step_end = t + dt
+            solver_args = (dx, C_viscosity, bc_left, bc_right)
+            sol = solve_ivp(burgers_rhs, (t, step_end), u, args=solver_args, method='BDF', t_eval=[step_end])
+            u = sol.y[:, -1]
+
+            t = sol.t[-1]
+            t_index = int(t/dt)
+            solution_history[t_index] = u.copy()
+            print(f"[Standalone ] t={t:6.4f}")
 
     if not aborted:
-
-        run_dir = os.getcwd()
-        output_filename = os.path.join(run_dir, f"{participant_name.lower()}.npz")
 
         cell_centers_x = np.linspace(local_domain_min + dx/2, local_domain_max - dx/2, nelems_local)
         internal_coords = np.array([cell_centers_x, np.zeros(nelems_local)]).T
 
-        sorted_times = sorted(solution_history.keys())
-        final_solution = np.array([solution_history[time] for time in sorted_times])
+        sorted_times_index = sorted(solution_history.keys())
+        final_solution = np.array([solution_history[t_index] for t_index in sorted_times_index])
 
         np.savez(
             output_filename,
             internal_coordinates=internal_coords,
             **{"Solver-Mesh-1D-Internal": final_solution}
         )
-        print(f"[{participant_name}] Results saved to {output_filename}")
+        print(f"Results saved to {output_filename}")
     else:
         raise RuntimeError("Simulation aborted.")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("participant", help="Name of the participant", choices=['Dirichlet', 'Neumann'])
+    parser.add_argument("participant", help="Name of the participant", choices=['Dirichlet', 'Neumann', 'None'])
     args = parser.parse_args()
     main(args.participant)
