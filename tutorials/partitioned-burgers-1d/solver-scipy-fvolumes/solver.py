@@ -30,7 +30,7 @@ def burgers_rhs(t, u, dx, C, bc_left, bc_right):
     for i in range(len(flux)):
         flux[i] = lax_friedrichs_flux(u_padded[i], u_padded[i+1])
 
-    # Numerical viscosity
+    # viscosity
     viscosity = C * (u_padded[2:] - 2 * u_padded[1:-1] + u_padded[:-2]) / dx**2
     return -(flux[1:] - flux[:-1]) / dx + viscosity
 
@@ -108,19 +108,13 @@ def main(participant_name: str):
 
     solution_history = {0.0: u.copy()}
 
-    if participant.requires_initial_data():
-        if participant_name == "Dirichlet":
-            du_dx = (u[-1] - u[-2]) / dx
-            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx])
-        else: # Neumann
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
-
     participant.initialize()
 
     dt = participant.get_max_time_step_size()
     t = 0.0
     saved_t = 0.0
     C_viscosity = 1e-12
+    aborted = False
 
     # --- Serial Coupling Loop ---
     if participant_name == "Dirichlet":
@@ -134,19 +128,25 @@ def main(participant_name: str):
                 t = saved_t
                 # print(f"[Dirichlet] Reading checkpoint at t={t:.4f}")
 
-            bc_right = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
-            bc_left = 0
+            u_interface = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
+
+            bc_right = 2*u_interface - u[-1]
 
             t_end = t + dt
-            solver_args = (dx, C_viscosity, bc_left, bc_right)
+            solver_args = (dx, C_viscosity, 0, bc_right)
             sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
             u = sol.y[:, -1]
-            
-            du_dx = (u[-1] - u[-2]) / dx
-            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx])
 
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_int={u[-1]:8.4f} | du/dx_loc={(u[-1]-u[-2])/dx:8.4f}")
-            
+            bc_right = 2*u_interface - u[-1] # Update BC to be consistent with the communicated interface value
+
+            du_dx_interface = (bc_right - u[-1]) / dx
+            u_interface = (bc_right + u[-1]) / 2
+            flux_across_interface = lax_friedrichs_flux(u[-1], bc_right)
+
+            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx_interface])
+
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_interface={u_interface:8.4f} | du_dx_across={du_dx_interface:8.4f} | flux_across={flux_across_interface:8.4f}")
+
             t = sol.t[-1]
             solution_history[t] = u.copy()
             participant.advance(dt)
@@ -162,18 +162,28 @@ def main(participant_name: str):
                 t = saved_t
                 # print(f"[Neumann] Reading checkpoint at t={t:.4f}")
                             
-            du_dx_bc = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
+            du_dx_recv = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
             
-            bc_left = u[0] - dx * du_dx_bc
-            bc_right = 0
-
+            bc_left = u[0] - du_dx_recv * dx
+            
             t_end = t + dt
-            solver_args = (dx, C_viscosity, bc_left, bc_right)
+            solver_args = (dx, C_viscosity, bc_left, 0)
             sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
             u = sol.y[:, -1]
 
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_int={u[0]:8.4f} | du/dx_loc={(u[1]-u[0])/dx:8.4f}")
+            bc_left = u[0] - du_dx_recv * dx # Update BC to be consistent with the communicated interface value
+            u_interface = (bc_left + u[0]) / 2 
+            du_dx_interface = (u[0] - bc_left) / dx
+            flux_across_interface = lax_friedrichs_flux(bc_left, u[0])
+
+            if u_interface < 0 and t > 0:
+                print(f"[{participant_name}] Only upwind scheme implemented, aborting!")
+                aborted = True
+                break
+
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u_interface])
+
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_interface={u_interface:8.4f} | du_dx_across={du_dx_interface:8.4f} | flux_across={flux_across_interface:8.4f}")
 
             t = sol.t[-1]
             solution_history[t] = u.copy()
@@ -182,21 +192,25 @@ def main(participant_name: str):
     # Finalize and save data to npz array
     participant.finalize()
 
-    run_dir = os.getcwd()
-    output_filename = os.path.join(run_dir, f"{participant_name.lower()}.npz")
+    if not aborted:
 
-    cell_centers_x = np.linspace(local_domain_min + dx/2, local_domain_max - dx/2, nelems_local)
-    internal_coords = np.array([cell_centers_x, np.zeros(nelems_local)]).T
+        run_dir = os.getcwd()
+        output_filename = os.path.join(run_dir, f"{participant_name.lower()}.npz")
 
-    sorted_times = sorted(solution_history.keys())
-    final_solution = np.array([solution_history[time] for time in sorted_times])
+        cell_centers_x = np.linspace(local_domain_min + dx/2, local_domain_max - dx/2, nelems_local)
+        internal_coords = np.array([cell_centers_x, np.zeros(nelems_local)]).T
 
-    np.savez(
-        output_filename,
-        internal_coordinates=internal_coords,
-        **{"Solver-Mesh-1D-Internal": final_solution}
-    )
-    print(f"[{participant_name}] Results saved to {output_filename}")
+        sorted_times = sorted(solution_history.keys())
+        final_solution = np.array([solution_history[time] for time in sorted_times])
+
+        np.savez(
+            output_filename,
+            internal_coordinates=internal_coords,
+            **{"Solver-Mesh-1D-Internal": final_solution}
+        )
+        print(f"[{participant_name}] Results saved to {output_filename}")
+    else:
+        raise RuntimeError("Simulation aborted.")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

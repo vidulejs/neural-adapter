@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e -u
 
-python3 generate_ic.py --epoch 0
+rm precice-run -rf
+
+python3 generate_ic.py --epoch 10
 
 cd dirichlet-scipy; pwd; ./run.sh &
 cd ../neumann-scipy; pwd; ./run.sh && cd ..
