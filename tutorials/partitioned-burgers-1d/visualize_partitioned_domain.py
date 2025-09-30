@@ -53,6 +53,37 @@ plt.legend()
 plt.savefig(os.path.join(CASE_DIR, f'full_domain_timestep_slice.png'))
 print(f"Saved plot to full_domain_timestep_slice.png")
 
+if gt_exists:
+    # residual
+    residual = full_solution_history[TIMESTEP_TO_PLOT, :] - solution_gt[TIMESTEP_TO_PLOT, :]
+    l2_norm_residual = np.linalg.norm(residual)
+    l2_norm_gt = np.linalg.norm(solution_gt[TIMESTEP_TO_PLOT, :])
+    relative_residual = l2_norm_residual / l2_norm_gt if l2_norm_gt > 1e-9 else 0.0
+
+    nelems_total = solution_gt.shape[1]
+    interface_idx = nelems_total // 2 - 1
+    dx = coords_gt[1, 0] - coords_gt[0, 0]
+
+    # t = 0
+    u0_gt = solution_gt[0, :]
+    val_at_interface_t0 = (u0_gt[interface_idx] + u0_gt[interface_idx + 1]) / 2.0
+    grad_at_interface_t0 = (u0_gt[interface_idx + 1] - u0_gt[interface_idx]) / dx
+
+    # t = TIMESTEP_TO_PLOT
+    u_plot_gt = solution_gt[TIMESTEP_TO_PLOT, :]
+    val_at_interface_plot = (u_plot_gt[interface_idx] + u_plot_gt[interface_idx + 1]) / 2.0
+    grad_at_interface_plot = (u_plot_gt[interface_idx + 1] - u_plot_gt[interface_idx]) / dx
+
+    print("---")
+    print("Ground truth u at interface:")
+    print(f"  t=0: u = {val_at_interface_t0:8.4f}, du/dx = {grad_at_interface_t0:8.4f}")
+    print(f"  t={TIMESTEP_TO_PLOT}: u = {val_at_interface_plot:8.4f}, du/dx = {grad_at_interface_plot:8.4f}")
+    print()
+    print(f"Residual at t={TIMESTEP_TO_PLOT}:")
+    print(f"  L2 Norm of Absolute Residual: {l2_norm_residual:10.6f}")
+    print(f"  L2 Norm of Relative Residual: {relative_residual:10.6f}")
+    print("---")
+
 # --- plot gradient at single timestep ---
 solution_slice = full_solution_history[TIMESTEP_TO_PLOT, :]
 du_dx = np.gradient(solution_slice, full_coords)

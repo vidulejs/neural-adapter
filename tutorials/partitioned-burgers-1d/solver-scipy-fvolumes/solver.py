@@ -1,22 +1,21 @@
 """
 This script solves the 1D viscous Burgers' equation for a partitioned domain problem.
 The two participants:
-- 'Dirichlet': Solves the left half of the domain.
+- 'Dirichlet': Solves the left half of the domain. Receives Dirichlet BC from 'Neumann'. Provides Neumann BC to 'Neumann'.
 - 'Neumann':   Solves the right half of the domain.
 
-# |<-----------------Dirichlet-------------------->|<--------------------Neumann-------------------->|
-# | bc_left = 0|  |  ...  |   | u[-1] <|> bc_right | bc_left <|> u[0] |   |  ...  |   | bc_right = 0 |
-# |<------------------ u ------------------------->|<-------------------- u ------------------------>|
-# |                              <u_interface>     |    <u_interface>                                |
+# |<---------------------Dirichlet---------------------->|<--------------------Neumann----------------------->|
+# | du_dx=0 |  ...  |  ...  |  ...  | u[-1] <|> bc_right | bc_left <|> u[0] |  ...  |  ...  |  ...  | du_dx=0 |
+# |<----------------------- u -------------------------->|<----------------------- u ------------------------>|
+# | bc_left |                          <u_interface>     |    <u_interface>                        | bc_right |
 """
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.sparse import diags
+from scipy.sparse import diags, identity
 import precice
 import json
 import os
 import argparse
-import time
 
 def lax_friedrichs_flux(u_left, u_right): # Flux at cell interface between i-1/2 and i+1/2
     return 0.5 * (0.5 * u_left**2 + 0.5 * u_right**2) - 0.5 * (u_right - u_left)
@@ -39,45 +38,97 @@ def burgers_rhs(t, u, dx, C, bc_left, bc_right):
     viscosity = C * (u_padded[2:] - 2 * u_padded[1:-1] + u_padded[:-2]) / dx**2
     return -(flux[1:] - flux[:-1]) / dx + viscosity
 
-# def burgers_jacobian(t, u, dx, C, bc_left, bc_right):
-#     n = len(u)
-#     # Derivatives of the Lax-Friedrichs flux
-#     # dF/du_L = 0.5 * u_L + 0.5
-#     # dF/du_R = 0.5 * u_R - 0.5
-#     
-#     # Contribution of flux_{i+1/2} to the diagonal at i
-#     d_flux_di_plus = -(0.5 * u + 0.5) / dx
-#     # Contribution of flux_{i-1/2} to the diagonal at i
-#     d_flux_di_minus = (0.5 * u - 0.5) / dx
-#     
-#     # Off-diagonals
-#     d_flux_d_up1 = -(0.5 * u[1:] - 0.5) / dx
-#     d_flux_d_um1 = (0.5 * u[:-1] + 0.5) / dx
-#
-#     # --- Viscous Part ---
-#     d_visc_di = -2 * C / dx**2
-#     d_visc_off = C / dx**2
-#
-#     main_diag = d_flux_di_plus + d_flux_di_minus + d_visc_di
-#     upper_diag = d_flux_d_up1 + d_visc_off
-#     lower_diag = d_flux_d_um1 + d_visc_off
-#
-#     # Construct Jacobian
-#     jac = diags([main_diag, upper_diag, lower_diag], [0, 1, -1], shape=(n, n), format='csc')
-#
-#     return jac
+def burgers_jacobian(t, u, dx, C, bc_left, bc_right):
+    n = len(u)
+    
+    u_padded = np.empty(n + 2)
+    u_padded[0] = bc_left
+    u_padded[-1] = bc_right
+    u_padded[1:-1] = u
+    
+    # --- viscosity (constant) ---
+    d_visc_di = -2 * C / dx**2
+    d_visc_off = C / dx**2
+
+    # --- flux (Lax-Friedrichs) ---
+    df_du_di = -1 / dx
+
+    # Upper diagonal
+    df_du_upper = -(0.5 * u_padded[2:n+1] - 0.5) / dx
+
+    # Lower diagonal
+    df_du_lower = (0.5 * u_padded[0:n-1] + 0.5) / dx
+
+    main_diag = df_du_di + d_visc_di
+    upper_diag = df_du_upper + d_visc_off
+    lower_diag = df_du_lower + d_visc_off
+
+    jac = diags([main_diag, upper_diag, lower_diag], [0, 1, -1], shape=(n, n), format='csc')
+
+    return jac
+
+class BoundaryWrapper:
+    """
+    Wrap the RHS and Jacobian to dynamiclly set BCs during the solve iterations with the updated state u. 
+    """
+    def __init__(self, dx, C, participant_name, u_from_neumann=None, du_dx_recv=None):
+        self.dx = dx
+        self.C = C
+        self.participant_name = participant_name
+        self.u_from_neumann = u_from_neumann
+        self.du_dx_recv = du_dx_recv
+
+    def bc_left(self, u):
+        if self.participant_name == "Neumann":
+            return u[0] - self.du_dx_recv * self.dx
+        # zero gradient at outer boundary
+        elif self.participant_name == "Dirichlet":
+            return u[0]
+        else:
+            return u[0]
+    
+    def bc_right(self, u):
+        if self.participant_name == "Dirichlet":
+            return self.u_from_neumann
+        # zero gradient at outer boundary
+        elif self.participant_name == "Neumann":
+            return u[-1]
+        else:
+            return u[-1]
+
+    def rhs(self, t, u):
+        bc_left = self.bc_left(u)
+        bc_right = self.bc_right(u)
+        return burgers_rhs(t, u, self.dx, self.C, bc_left, bc_right)
+
+    def jac(self, t, u):
+        bc_left = self.bc_left(u)
+        bc_right = self.bc_right(u)
+        
+        J_rhs = burgers_jacobian(t, u, self.dx, self.C, bc_left, bc_right)
+        return J_rhs
 
 def main(participant_name: str):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     case_dir = os.path.abspath(os.path.join(script_dir, '..'))
     run_dir = os.getcwd()
 
+    config_path = os.path.join(case_dir, "precice-config.xml")
 
     if participant_name == 'None':
+        # read precice config to get t_final and dt
+        import re
         print("Participant not specified. Running full domain without preCICE")
         participant_name = None
+
+        with open(config_path, 'r') as f:
+            precice_config = f.read()
+        max_time_match = re.search(r'<max-time\s+value="([^"]+)"\s*/>', precice_config)
+        t_final = float(max_time_match.group(1))
+        dt_match = re.search(r'<time-window-size\s+value="([^"]+)"\s*/>', precice_config)
+        dt = float(dt_match.group(1))
+        print(f"t_final = {t_final}, dt = {dt}")
     else:
-        config_path = os.path.join(case_dir, "precice-config.xml")
         participant = precice.Participant(participant_name, config_path, 0, 1)
 
     # Read initial condition
@@ -109,13 +160,6 @@ def main(participant_name: str):
         local_domain_min = full_domain_min
         local_domain_max = full_domain_max
         nelems_local = nelems_total
-        dt = 0.01 # Fixed time step for standalone run
-        t_end = 0.1
-
-    if participant_name is not None:
-        vertex_id = participant.set_mesh_vertices(mesh_name, coupling_point)
-        participant.initialize()
-        dt = participant.get_max_time_step_size()
 
     ic_data = np.load(os.path.join(case_dir, "initial_condition.npz"))
     full_ic = ic_data['initial_condition']
@@ -125,6 +169,19 @@ def main(participant_name: str):
         u = full_ic[nelems_local:]
     else:
         u = full_ic
+
+    if participant_name is not None:
+        vertex_id = participant.set_mesh_vertices(mesh_name, coupling_point)
+
+        if participant.requires_initial_data():
+            if participant_name == "Dirichlet":
+                du_dx_send = (u[-1] - u[-2]) / dx # take forward difference inside domain for initial send
+                participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx_send])
+            if participant_name == "Neumann":
+                participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
+
+        participant.initialize()
+        dt = participant.get_max_time_step_size()
 
     solution_history = {int(0): u.copy()}
 
@@ -148,21 +205,20 @@ def main(participant_name: str):
 
             u_from_neumann = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
 
-            bc_right = u_from_neumann
-
             t_end = t + dt
-            solver_args = (dx, C_viscosity, 0, bc_right)
-            sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
+            wrapper = BoundaryWrapper(dx, C_viscosity, "Dirichlet", u_from_neumann=u_from_neumann)
+            sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
             u = sol.y[:, -1]
-            # u = u + dt * burgers_rhs(t, u, *solver_args)
+            # u = u + dt * burgers_rhs(t, u, *solver_args) # Explicit Euler
 
+            bc_right = wrapper.bc_right(u)
 
-            gradient_to_send = (u_from_neumann - u[-1]) / dx
+            du_dx_send = (u_from_neumann - u[-1]) / dx
             flux_across_interface = flux_function(u[-1], bc_right)
      
-            participant.write_data(mesh_name, write_data_name, vertex_id, [gradient_to_send])
+            participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx_send])
 
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_from_neumann:8.4f} | grad_sent={gradient_to_send:8.4f} | flux_across={flux_across_interface:8.4f}")
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_from_neumann:8.4f} | grad_send={du_dx_send:8.4f} | flux_across={flux_across_interface:8.4f}")
 
             t = saved_t + dt
             t_index = int(t/dt)
@@ -182,22 +238,14 @@ def main(participant_name: str):
                             
             du_dx_recv = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
             
-            bc_left = u[0] - du_dx_recv * dx
-            
             t_end = t + dt
-            solver_args = (dx, C_viscosity, bc_left, 0)
-            sol = solve_ivp(burgers_rhs, (t, t_end), u, args=solver_args, method='BDF', t_eval=[t_end])
+            wrapper = BoundaryWrapper(dx, C_viscosity, "Neumann", du_dx_recv=du_dx_recv)
+            sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
             u = sol.y[:, -1]
-            # u = u + dt * burgers_rhs(t, u, *solver_args)
+            # u = u + dt * burgers_rhs(t, u, *solver_args) # Explicit Euler
 
-
-            bc_left = u[0] - du_dx_recv * dx # Update bc_left to be consistent with the new state
+            bc_left = wrapper.bc_left(u)
             flux_across_interface = flux_function(bc_left, u[0])
-
-            # if u[0] < 0 and t > 0:
-            #     print(f"[{participant_name}] Only upwind scheme implemented, aborting!")
-            #     aborted = True
-            #     break
 
             participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
 
@@ -217,17 +265,18 @@ def main(participant_name: str):
         print("Starting standalone simulation without preCICE")
         bc_left, bc_right = 0, 0
 
-        while t + dt < t_end:
-            step_end = t + dt
-            solver_args = (dx, C_viscosity, bc_left, bc_right)
-            sol = solve_ivp(burgers_rhs, (t, step_end), u, args=solver_args, method='BDF', t_eval=[step_end], )
+        while t + dt < t_final:
+
+            print(f"[Standalone ] t={t:6.4f}")
+            t_end = t + dt
+            wrapper = BoundaryWrapper(dx, C_viscosity, "None")
+            sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
             u = sol.y[:, -1]
-            # u = u + dt * burgers_rhs(t, u, *solver_args)
+            # u = u + dt * burgers_rhs(t, u, *solver_args) # Explicit Euler
             
             t = t + dt
             t_index = int(t/dt)
             solution_history[t_index] = u.copy()
-            print(f"[Standalone ] t={t:6.4f}")
 
     if not aborted:
 
