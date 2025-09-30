@@ -89,7 +89,7 @@ class BoundaryWrapper:
     
     def bc_right(self, u):
         if self.participant_name == "Dirichlet":
-            return self.u_from_neumann
+            return 2*self.u_from_neumann - u[-1]
         # zero gradient at outer boundary
         elif self.participant_name == "Neumann":
             return u[-1]
@@ -207,18 +207,20 @@ def main(participant_name: str):
 
             t_end = t + dt
             wrapper = BoundaryWrapper(dx, C_viscosity, "Dirichlet", u_from_neumann=u_from_neumann)
+
             sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
             u = sol.y[:, -1]
-            # u = u + dt * burgers_rhs(t, u, *solver_args) # Explicit Euler
+            # u = u + dt * burgers_rhs(t, u, dx,  C_viscosity, wrapper.bc_left(u), wrapper.bc_right(u)) # Explicit Euler
 
             bc_right = wrapper.bc_right(u)
 
-            du_dx_send = (u_from_neumann - u[-1]) / dx
+            du_dx_send = (bc_right - u[-1]) / dx
             flux_across_interface = flux_function(u[-1], bc_right)
+            u_interface = (u[-1] + bc_right) / 2.0
      
             participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx_send])
 
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_from_neumann:8.4f} | grad_send={du_dx_send:8.4f} | flux_across={flux_across_interface:8.4f}")
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_interface:8.4f} | du_dx={du_dx_send:8.4f} | flux_across={flux_across_interface:8.4f}")
 
             t = saved_t + dt
             t_index = int(t/dt)
@@ -242,14 +244,16 @@ def main(participant_name: str):
             wrapper = BoundaryWrapper(dx, C_viscosity, "Neumann", du_dx_recv=du_dx_recv)
             sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
             u = sol.y[:, -1]
-            # u = u + dt * burgers_rhs(t, u, *solver_args) # Explicit Euler
+            # u = u + dt * burgers_rhs(t, u, dx,  C_viscosity, wrapper.bc_left(u), wrapper.bc_right(u)) # Explicit Euler
 
             bc_left = wrapper.bc_left(u)
             flux_across_interface = flux_function(bc_left, u[0])
+            u_interface = (bc_left + u[0]) / 2.0
+            du_dx = (u[0] - bc_left) / dx
 
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u_interface])
 
-            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u[0]:8.4f} | grad_recv={du_dx_recv:8.4f} | flux_across={flux_across_interface:8.4f}")
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_interface:8.4f} | du_dx={du_dx:8.4f} | flux_across={flux_across_interface:8.4f}")
 
             t = saved_t + dt
             t_index = int(t/dt)
@@ -272,7 +276,7 @@ def main(participant_name: str):
             wrapper = BoundaryWrapper(dx, C_viscosity, "None")
             sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
             u = sol.y[:, -1]
-            # u = u + dt * burgers_rhs(t, u, *solver_args) # Explicit Euler
+            # u = u + dt * burgers_rhs(t, u, dx,  C_viscosity, wrapper.bc_left(u), wrapper.bc_right(u)) # Explicit Euler
             
             t = t + dt
             t_index = int(t/dt)
