@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-TIMESTEP_TO_PLOT = 5 #eg. 0, 1, ..., n, ... ,-1
+TIMESTEP_TO_PLOT = 50 #eg. 0, 1, ..., n, ... ,-1
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
@@ -80,8 +80,8 @@ if gt_exists:
     print(f"  t={TIMESTEP_TO_PLOT}: u = {val_at_interface_plot:8.4f}, du/dx = {grad_at_interface_plot:8.4f}")
     print()
     print(f"Residual at t={TIMESTEP_TO_PLOT}:")
-    print(f"  L2 Norm of Absolute Residual: {l2_norm_residual:10.6f}")
-    print(f"  L2 Norm of Relative Residual: {relative_residual:10.6f}")
+    print(f"  L2 Norm of Absolute Residual: {l2_norm_residual:10.6e}")
+    print(f"  L2 Norm of Relative Residual: {relative_residual:10.6e}")
     print("---")
 
 # --- plot gradient at single timestep ---

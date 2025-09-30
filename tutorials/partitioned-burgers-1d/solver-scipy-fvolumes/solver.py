@@ -12,6 +12,7 @@ The two participants:
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.sparse import diags, identity
+from scipy.optimize import root
 import precice
 import json
 import os
@@ -67,9 +68,18 @@ def burgers_jacobian(t, u, dx, C, bc_left, bc_right):
 
     return jac
 
+def burgers_residual(u_new, u_old, dt, dx, C, bc_left, bc_right):
+    return u_new - u_old - dt * burgers_rhs(0, u_new, dx, C, bc_left, bc_right)
+
+def burgers_jacobian_residual(u_new, u_old, dt, dx, C, bc_left, bc_right):
+    n = len(u_new)
+    I = identity(n, format='csc')
+    J_rhs = burgers_jacobian(0, u_new, dx, C, bc_left, bc_right)
+    return (I - dt * J_rhs).toarray() # doesn't work with sparse matrix in root solver for some reason
+
 class BoundaryWrapper:
     """
-    Wrap the RHS and Jacobian to dynamiclly set BCs during the solve iterations with the updated state u. 
+    Wrap the RHS and Jacobian to dynamically set BCs during the solve iterations with the updated state u. 
     """
     def __init__(self, dx, C, participant_name, u_from_neumann=None, du_dx_recv=None):
         self.dx = dx
@@ -89,7 +99,7 @@ class BoundaryWrapper:
     
     def bc_right(self, u):
         if self.participant_name == "Dirichlet":
-            return 2*self.u_from_neumann - u[-1]
+            return self.u_from_neumann
         # zero gradient at outer boundary
         elif self.participant_name == "Neumann":
             return u[-1]
@@ -107,6 +117,16 @@ class BoundaryWrapper:
         
         J_rhs = burgers_jacobian(t, u, self.dx, self.C, bc_left, bc_right)
         return J_rhs
+    
+    def rhs_residual(self, u_new, u_old, dt):
+        bc_left = self.bc_left(u_new)
+        bc_right = self.bc_right(u_new)
+        return burgers_residual(u_new, u_old, dt, self.dx, self.C, bc_left, bc_right)
+    
+    def jac_residual(self, u_new, u_old, dt):
+        bc_left = self.bc_left(u_new)
+        bc_right = self.bc_right(u_new)
+        return burgers_jacobian_residual(u_new, u_old, dt, self.dx, self.C, bc_left, bc_right)
 
 def main(participant_name: str):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -208,15 +228,18 @@ def main(participant_name: str):
             t_end = t + dt
             wrapper = BoundaryWrapper(dx, C_viscosity, "Dirichlet", u_from_neumann=u_from_neumann)
 
-            sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
-            u = sol.y[:, -1]
+            # sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac) # BDF higher order implicit timestepping
+            # u = sol.y[:, -1]
             # u = u + dt * burgers_rhs(t, u, dx,  C_viscosity, wrapper.bc_left(u), wrapper.bc_right(u)) # Explicit Euler
+
+            sol = root(wrapper.rhs_residual, u, args=(u, dt), jac=wrapper.jac_residual, method='hybr')
+            u = sol.x
 
             bc_right = wrapper.bc_right(u)
 
             du_dx_send = (bc_right - u[-1]) / dx
             flux_across_interface = flux_function(u[-1], bc_right)
-            u_interface = (u[-1] + bc_right) / 2.0
+            u_interface = (u[-1] + bc_right) / 2
      
             participant.write_data(mesh_name, write_data_name, vertex_id, [du_dx_send])
 
@@ -242,16 +265,19 @@ def main(participant_name: str):
             
             t_end = t + dt
             wrapper = BoundaryWrapper(dx, C_viscosity, "Neumann", du_dx_recv=du_dx_recv)
-            sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
-            u = sol.y[:, -1]
+            # sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac) # BDF higher order implicit timestepping
+            # u = sol.y[:, -1]
             # u = u + dt * burgers_rhs(t, u, dx,  C_viscosity, wrapper.bc_left(u), wrapper.bc_right(u)) # Explicit Euler
+
+            sol = root(wrapper.rhs_residual, u, args=(u, dt), jac=wrapper.jac_residual, method='hybr')
+            u = sol.x
 
             bc_left = wrapper.bc_left(u)
             flux_across_interface = flux_function(bc_left, u[0])
-            u_interface = (bc_left + u[0]) / 2.0
             du_dx = (u[0] - bc_left) / dx
+            u_interface = (bc_left + u[0]) / 2
 
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u_interface])
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
 
             print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_interface:8.4f} | du_dx={du_dx:8.4f} | flux_across={flux_across_interface:8.4f}")
 
@@ -274,9 +300,12 @@ def main(participant_name: str):
             print(f"[Standalone ] t={t:6.4f}")
             t_end = t + dt
             wrapper = BoundaryWrapper(dx, C_viscosity, "None")
-            sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac)
-            u = sol.y[:, -1]
+            # sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac) # BDF higher order implicit timestepping
+            # u = sol.y[:, -1]
             # u = u + dt * burgers_rhs(t, u, dx,  C_viscosity, wrapper.bc_left(u), wrapper.bc_right(u)) # Explicit Euler
+
+            sol = root(wrapper.rhs_residual, u, args=(u, dt), jac=wrapper.jac_residual, method='hybr')
+            u = sol.x
             
             t = t + dt
             t_index = int(t/dt)
