@@ -128,7 +128,7 @@ class BoundaryWrapper:
         bc_right = self.bc_right(u_new)
         return burgers_jacobian_residual(u_new, u_old, dt, self.dx, self.C, bc_left, bc_right)
 
-def main(participant_name: str):
+def main(participant_name: str, savefile_path: str = None):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     case_dir = os.path.abspath(os.path.join(script_dir, '..'))
     run_dir = os.getcwd()
@@ -291,13 +291,16 @@ def main(participant_name: str):
         participant.finalize()
         output_filename = os.path.join(run_dir, f"{participant_name.lower()}.npz")
     else:
-        output_filename = os.path.join(script_dir, "full_domain.npz")
-        print("Starting standalone simulation without preCICE")
+        if savefile_path:
+            output_filename = savefile_path
+        else:
+            output_filename = os.path.join(script_dir, "full_domain.npz")
+        print("Starting monolithic simulation without preCICE")
         bc_left, bc_right = 0, 0
 
-        while t + dt < t_final:
+        while t < t_final:
 
-            print(f"[Standalone ] t={t:6.4f}")
+            print(f"[Monolithic ] t={t:6.4f}")
             t_end = t + dt
             wrapper = BoundaryWrapper(dx, C_viscosity, "None")
             # sol = solve_ivp(wrapper.rhs, (t, t_end), u, method='BDF', t_eval=[t_end], jac=wrapper.jac) # BDF higher order implicit timestepping
@@ -331,5 +334,8 @@ def main(participant_name: str):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("participant", help="Name of the participant", choices=['Dirichlet', 'Neumann', 'None'])
+    parser.add_argument("--savefile", help="Path to save the output npz file")
     args = parser.parse_args()
-    main(args.participant)
+
+
+    main(args.participant, savefile_path=args.savefile)

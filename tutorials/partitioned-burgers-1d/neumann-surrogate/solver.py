@@ -45,7 +45,7 @@ def main():
     solution_history = {0.0: u.copy()}
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_path = os.path.join(script_dir, "CNN_RES_UNROLL_5_DGalerkin.pth")
+    model_path = os.path.join(script_dir, "CNN_RES_UNROLL_5.pth")
 
     NUM_RES_BLOCKS = 4
     KERNEL_SIZE = 5

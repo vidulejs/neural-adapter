@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 
-TIMESTEP_TO_PLOT = 50 #eg. 0, 1, ..., n, ... ,-1
+TIMESTEP_TO_PLOT = 10 #eg. 0, 1, ..., n, ... ,-1
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--neumann", default="neumann-scipy/neumann.npz", help="Path to the neumann participant's data file relative to the case directory.")
@@ -13,12 +13,12 @@ CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
 NEUMANN_DATA_PATH = os.path.join(CASE_DIR, args.neumann)
 
-GROUND_TRUTH_DATA_PATH = os.path.join(CASE_DIR, "solver-scipy-fvolumes", "full_domain.npz")
-if os.path.exists(GROUND_TRUTH_DATA_PATH):
-    print(f"Found ground truth data at {GROUND_TRUTH_DATA_PATH}")
+MONOLITHIC_DATA_PATH = os.path.join(CASE_DIR, "solver-scipy-fvolumes", "full_domain.npz")
+if os.path.exists(MONOLITHIC_DATA_PATH):
+    print(f"Found Monolithic data at {MONOLITHIC_DATA_PATH}")
     gt_exists = True
 else:
-    print(f"Ground truth data not found at {GROUND_TRUTH_DATA_PATH}.\nPlease run python3 solver-scipy-fvolumes/solver.py None.")
+    print(f"Monolithic data not found at {MONOLITHIC_DATA_PATH}.\nPlease run python3 solver-scipy-fvolumes/solver.py None.")
     gt_exists = False
 
 print(f"Loading data from {DIRICHLET_DATA_PATH}")
@@ -37,18 +37,18 @@ full_solution_history = np.concatenate((solution_d, solution_n), axis=1)
 print(f"Full domain shape: {full_solution_history.shape}")
 
 if gt_exists:
-    print(f"Loading ground truth data from {GROUND_TRUTH_DATA_PATH}")
-    data_gt = np.load(GROUND_TRUTH_DATA_PATH)
+    print(f"Loading Monolithic data from {MONOLITHIC_DATA_PATH}")
+    data_gt = np.load(MONOLITHIC_DATA_PATH)
     coords_gt = data_gt['internal_coordinates']
     solution_gt = data_gt['Solver-Mesh-1D-Internal']
 
-    print(f"Ground truth shape: {solution_gt.shape}")
+    print(f"Monolithic shape: {solution_gt.shape}")
 
 # --- plot single timestep ---
 plt.figure(figsize=(10, 5), dpi=200)
 plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', linestyle='-', label='Partitioned domain')
 if gt_exists:
-    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='x', linestyle='--', alpha=0.5, c="red", label='Ground truth')
+    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='x', linestyle='--', alpha=0.5, c="red", label='Monolithic')
 plt.title(f'Solution at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
 plt.ylabel('Solution Value (u)')
@@ -79,7 +79,7 @@ if gt_exists:
     grad_at_interface_plot = (u_plot_gt[interface_idx + 1] - u_plot_gt[interface_idx]) / dx
 
     print("---")
-    print("Ground truth u at interface:")
+    print("Monolithic u at interface:")
     print(f"  t=0: u = {val_at_interface_t0:8.4f}, du/dx = {grad_at_interface_t0:8.4f}")
     print(f"  t={TIMESTEP_TO_PLOT}: u = {val_at_interface_plot:8.4f}, du/dx = {grad_at_interface_plot:8.4f}")
     print()
@@ -98,7 +98,7 @@ plt.plot(full_coords, du_dx, marker='.', linestyle='-', label='Partitioned domai
 if gt_exists:
     solution_gt_slice = solution_gt[TIMESTEP_TO_PLOT, :]
     du_dx_gt = np.gradient(solution_gt_slice, coords_gt[:, 0])
-    plt.plot(coords_gt[:, 0], du_dx_gt, marker='x', linestyle='--', alpha=0.5, c="red", label='Ground truth')
+    plt.plot(coords_gt[:, 0], du_dx_gt, marker='x', linestyle='--', alpha=0.5, c="red", label='Monolithic')
 
 plt.title(f'Gradient (du/dx) at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
