@@ -1,13 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import argparse
 
 TIMESTEP_TO_PLOT = 50 #eg. 0, 1, ..., n, ... ,-1
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--neumann", default="neumann-scipy/neumann.npz", help="Path to the neumann participant's data file relative to the case directory.")
+args = parser.parse_args()
+
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
-NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "neumann-scipy", "neumann.npz")
-# NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "surrogate-burgers", "surrogate.npz")
+NEUMANN_DATA_PATH = os.path.join(CASE_DIR, args.neumann)
 
 GROUND_TRUTH_DATA_PATH = os.path.join(CASE_DIR, "solver-scipy-fvolumes", "full_domain.npz")
 if os.path.exists(GROUND_TRUTH_DATA_PATH):

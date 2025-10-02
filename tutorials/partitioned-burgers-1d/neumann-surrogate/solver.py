@@ -33,7 +33,7 @@ def main():
 
     # Set domain and preCICE setup
     mesh_name = "Neumann-Mesh"
-    read_data_name = "Flux"
+    read_data_name = "Gradient"
     write_data_name = "Velocity"
     local_domain_min = full_domain_min + nelems_local * dx
     coupling_point = [[local_domain_min, 0.0]]
@@ -45,7 +45,7 @@ def main():
     solution_history = {0.0: u.copy()}
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_path = os.path.join(script_dir, "CNN_RES_UNROLL_5.pth")
+    model_path = os.path.join(script_dir, "CNN_RES_UNROLL_5_DGalerkin.pth")
 
     NUM_RES_BLOCKS = 4
     KERNEL_SIZE = 5
@@ -79,6 +79,8 @@ def main():
     dt = participant.get_max_time_step_size()
     t = 0.0
     saved_t = 0.0
+    t_index = 0
+    solution_history = {int(0): u.copy()}
 
     # Main Coupling Loop 
     with torch.no_grad():
@@ -89,14 +91,12 @@ def main():
             if participant.requires_reading_checkpoint():
                 u = saved_u.copy()
                 t = saved_t
-
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
+                            
+            du_dx_recv = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
             
-            du_dx_bc = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
-            
-            # Calculate ghost cell value from received flux
-            bc_left = u[0] - dx * du_dx_bc
-            bc_right = 0.0  # Dirichlet on the far right wall
+            # Calculate ghost cell value from received gradient
+            bc_left = u[0] - dx * du_dx_recv
+            bc_right = u[-1]  # Zero gradient on right wall
 
             u_padded = np.empty(len(u) + 2)
             u_padded[0] = bc_left
@@ -108,8 +108,17 @@ def main():
             output_tensor = model(input_tensor)
             u = output_tensor.squeeze().cpu().numpy()
 
-            t += dt
-            solution_history[t] = u.copy()
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
+
+            bc_left = u[0] - dx * du_dx_recv
+            u_interface = (bc_left + u[0]) / 2
+            du_dx = (u[1] - u[0]) / dx
+
+            print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_interface:8.4f} | du_dx={du_dx:8.4f}")
+
+            t = saved_t + dt
+            t_index = int(t/dt)
+            solution_history[t_index] = u.copy()
             participant.advance(dt)
 
     # Finalize and save data to npz array
@@ -121,8 +130,8 @@ def main():
     cell_centers_x = np.linspace(local_domain_min + dx/2, local_domain_min + (nelems_local - 0.5) * dx, nelems_local)
     internal_coords = np.array([cell_centers_x, np.zeros(nelems_local)]).T
 
-    sorted_times = sorted(solution_history.keys())
-    final_solution = np.array([solution_history[time] for time in sorted_times])
+    sorted_times_index = sorted(solution_history.keys())
+    final_solution = np.array([solution_history[t_index] for t_index in sorted_times_index])
 
     np.savez(
         output_filename,
