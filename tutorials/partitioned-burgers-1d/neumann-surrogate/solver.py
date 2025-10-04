@@ -88,9 +88,11 @@ def main():
             if participant.requires_writing_checkpoint():
                 saved_u = u.copy()
                 saved_t = t
+                saved_t_index = t_index
             if participant.requires_reading_checkpoint():
                 u = saved_u.copy()
                 t = saved_t
+                t_index = saved_t_index
                             
             du_dx_recv = participant.read_data(mesh_name, read_data_name, vertex_id, dt)[0]
             
@@ -117,7 +119,7 @@ def main():
             print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_interface:8.4f} | du_dx={du_dx:8.4f}")
 
             t = saved_t + dt
-            t_index = int(t/dt)
+            t_index += 1
             solution_history[t_index] = u.copy()
             participant.advance(dt)
 
