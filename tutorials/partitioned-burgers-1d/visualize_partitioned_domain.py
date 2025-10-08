@@ -3,11 +3,11 @@ import matplotlib.pyplot as plt
 import os
 import argparse
 
-TIMESTEP_TO_PLOT = 10 #eg. 0, 1, ..., n, ... ,-1
-
 parser = argparse.ArgumentParser()
+parser.add_argument('TIMESTEP_TO_PLOT', nargs='?', type=int, default=10, help="Timestep to plot, default is 10.")
 parser.add_argument("--neumann", default="neumann-scipy/neumann.npz", help="Path to the neumann participant's data file relative to the case directory.")
 args = parser.parse_args()
+TIMESTEP_TO_PLOT = args.TIMESTEP_TO_PLOT
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
