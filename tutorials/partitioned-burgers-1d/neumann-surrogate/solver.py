@@ -4,23 +4,36 @@ import precice
 import os
 import sys
 import json
-import argparse
-import time
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(script_dir, '..', '..', '..'))
-sys.path.append(project_root)
+from model import CNN_RES
+from config import INPUT_SIZE, OUTPUT_SIZE, HIDDEN_SIZE, NUM_RES_BLOCKS, KERNEL_SIZE, MODEL_NAME, ACTIVATION
 
-from neural_surrogate.model import CNN_RES
-from neural_surrogate.config import *
+GHOST_CELLS = INPUT_SIZE - OUTPUT_SIZE
 
 def main():
     participant_name = "Neumann"
-
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     case_dir = os.path.abspath(os.path.join(script_dir, '..'))
     config_path = os.path.join(case_dir, "precice-config.xml")
-    
-    participant = precice.Participant(participant_name, config_path, 0, 1)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = CNN_RES(
+        hidden_channels=HIDDEN_SIZE,
+        num_blocks=NUM_RES_BLOCKS,
+        kernel_size=KERNEL_SIZE,
+        activation=ACTIVATION,
+        ghost_cells=GHOST_CELLS
+    )
+
+    if not os.path.exists(MODEL_NAME):
+        print(f"Model file not found at {MODEL_NAME}")
+        sys.exit(1)
+
+    model.load_state_dict(torch.load(MODEL_NAME))
+    model.to(device)
+    model.eval()
+    print("Neural surrogate model loaded successfully.")
 
     # Read initial condition
     with open(os.path.join(case_dir, "ic_params.json"), 'r') as f:
@@ -32,42 +45,20 @@ def main():
     full_domain_max = domain_config["full_domain_max"]
     dx = (full_domain_max - full_domain_min) / nelems_total
 
+    ic_data = np.load(os.path.join(case_dir, "initial_condition.npz"))
+    full_ic = ic_data['initial_condition']
+    u = full_ic[nelems_local:]
+    solution_history = {0.0: u.copy()}
+
     # Set domain and preCICE setup
+    participant = precice.Participant(participant_name, config_path, 0, 1)
+
     mesh_name = "Neumann-Mesh"
     read_data_name = "Gradient"
     write_data_name = "Velocity"
     local_domain_min = full_domain_min + nelems_local * dx
     coupling_point = [[local_domain_min, 0.0]]
     vertex_id = participant.set_mesh_vertices(mesh_name, coupling_point)
-
-    ic_data = np.load(os.path.join(case_dir, "initial_condition.npz"))
-    full_ic = ic_data['initial_condition']
-    u = full_ic[nelems_local:]
-    solution_history = {0.0: u.copy()}
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    models_dir = os.path.join(project_root, "neural_surrogate", "models")
-    model_name = "CNN_RES_UNROLL_7.pth"
-    model_path = os.path.join(models_dir, model_name)
-
-    model = CNN_RES(
-        hidden_channels=HIDDEN_SIZE,
-        num_blocks=NUM_RES_BLOCKS,
-        kernel_size=KERNEL_SIZE,
-        activation=torch.nn.ReLU,
-        ghost_cells=2
-    )
-
-    if not os.path.exists(model_path):
-        print(f"Model file not found at {model_path}")
-        sys.exit(1)
-
-
-    model.load_state_dict(torch.load(model_path))
-    model.to(device)
-    model.eval()
-
-    print("Neural surrogate model loaded successfully.")
 
     if participant.requires_initial_data():
         participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
@@ -107,7 +98,6 @@ def main():
             
             output_tensor = model(input_tensor)
             u = output_tensor.squeeze().cpu().numpy()
-            # u[0] = (4 * u[1] - u[2] - 2 * dx * du_dx_recv) / 3.0
 
             bc_left = u[0] - dx * du_dx_recv
 
