@@ -12,6 +12,7 @@ project_root = os.path.abspath(os.path.join(script_dir, '..', '..', '..'))
 sys.path.append(project_root)
 
 from neural_surrogate.model import CNN_RES
+from neural_surrogate.config import *
 
 def main():
     participant_name = "Neumann"
@@ -45,19 +46,16 @@ def main():
     solution_history = {0.0: u.copy()}
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_path = os.path.join(script_dir, "CNN_RES_UNROLL_5.pth")
-
-    NUM_RES_BLOCKS = 4
-    KERNEL_SIZE = 5
-    
-    INPUT_SIZE = 128 + 2 # +2 for ghost cells
-    HIDDEN_SIZE = 256
-    OUTPUT_SIZE = 128
+    models_dir = os.path.join(project_root, "neural_surrogate", "models")
+    model_name = "CNN_RES_UNROLL_7.pth"
+    model_path = os.path.join(models_dir, model_name)
 
     model = CNN_RES(
         hidden_channels=HIDDEN_SIZE,
         num_blocks=NUM_RES_BLOCKS,
-        kernel_size=KERNEL_SIZE
+        kernel_size=KERNEL_SIZE,
+        activation=torch.nn.ReLU,
+        ghost_cells=2
     )
 
     if not os.path.exists(model_path):
@@ -65,7 +63,7 @@ def main():
         sys.exit(1)
 
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.load_state_dict(torch.load(model_path))
     model.to(device)
     model.eval()
 
@@ -109,12 +107,14 @@ def main():
             
             output_tensor = model(input_tensor)
             u = output_tensor.squeeze().cpu().numpy()
-
-            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
+            # u[0] = (4 * u[1] - u[2] - 2 * dx * du_dx_recv) / 3.0
 
             bc_left = u[0] - dx * du_dx_recv
+
+            du_dx = (u[0] - bc_left) / dx
             u_interface = (bc_left + u[0]) / 2
-            du_dx = (u[1] - u[0]) / dx
+
+            participant.write_data(mesh_name, write_data_name, vertex_id, [u[0]])
 
             print(f"[{participant_name:9s}] t={t:6.4f} | u_coupling={u_interface:8.4f} | du_dx={du_dx:8.4f}")
 

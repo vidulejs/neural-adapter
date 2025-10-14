@@ -37,3 +37,4 @@ tutorials/channel-transport/fluid-openfoam.template/param_sets/*.yml
 
 *.npz
 *.png
+*.log

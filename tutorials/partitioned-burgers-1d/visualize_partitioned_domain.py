@@ -45,24 +45,33 @@ if gt_exists:
     print(f"Monolithic shape: {solution_gt.shape}")
 
 # --- plot single timestep ---
-plt.figure(figsize=(10, 5), dpi=200)
-plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', linestyle='-', label='Partitioned domain')
+plt.figure(figsize=(10, 5), dpi=300)
+plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', markersize=8, linestyle='-', label=f'Partitioned Solution\n{args.neumann.split("/")[0]}')
+
 if gt_exists:
-    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='x', linestyle='--', alpha=0.5, c="red", label='Monolithic')
+    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='+', linestyle=':',  c="crimson", alpha=1, label='Monolithic Solution')
 plt.title(f'Solution at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
 plt.ylabel('Solution Value (u)')
 plt.grid(True)
-plt.legend()
+
+u_max = np.max(full_solution_history[TIMESTEP_TO_PLOT, :])
+u_min = np.min(full_solution_history[TIMESTEP_TO_PLOT, :])
+u_interface = full_solution_history[TIMESTEP_TO_PLOT, full_coords.searchsorted(1.0)]
+u_offset = (u_max-u_min)*0.125
+plt.vlines(x=1, ymin=u_min-u_offset, ymax=u_interface-u_offset, color='gray', linestyle='--', label='Interface')
+plt.vlines(x=1, ymin=u_interface+u_offset, ymax=u_max+u_offset*2, color='gray', linestyle='--')
+
+plt.legend(loc='upper left')
 plt.savefig(os.path.join(CASE_DIR, f'full_domain_timestep_slice.png'))
 print(f"Saved plot to full_domain_timestep_slice.png")
 
 if gt_exists:
     # residual
     residual = full_solution_history[TIMESTEP_TO_PLOT, :] - solution_gt[TIMESTEP_TO_PLOT, :]
-    l2_norm_residual = np.linalg.norm(residual)
-    l2_norm_gt = np.linalg.norm(solution_gt[TIMESTEP_TO_PLOT, :])
-    relative_residual = l2_norm_residual / l2_norm_gt if l2_norm_gt > 1e-9 else 0.0
+    mse = np.mean(np.square(residual))
+    mse_gt_vs_zero = np.mean(np.square(solution_gt[TIMESTEP_TO_PLOT, :]))
+    relative_mse = mse / mse_gt_vs_zero if mse_gt_vs_zero > 1e-9 else 0.0
 
     nelems_total = solution_gt.shape[1]
     interface_idx = nelems_total // 2 - 1
@@ -84,27 +93,35 @@ if gt_exists:
     print(f"  t={TIMESTEP_TO_PLOT}: u = {val_at_interface_plot:8.4f}, du/dx = {grad_at_interface_plot:8.4f}")
     print()
     print(f"Residual at t={TIMESTEP_TO_PLOT}:")
-    print(f"  L2 Norm of Absolute Residual: {l2_norm_residual:10.6e}")
-    print(f"  L2 Norm of Relative Residual: {relative_residual:10.6e}")
+    print(f"  Mean Squared Error (MSE): {mse:10.6e}")
+    print(f"  Relative MSE: {relative_mse:10.6e}")
     print("---")
 
 # --- plot gradient at single timestep ---
 solution_slice = full_solution_history[TIMESTEP_TO_PLOT, :]
 du_dx = np.gradient(solution_slice, full_coords)
 
-plt.figure(figsize=(10, 5), dpi=200)
-plt.plot(full_coords, du_dx, marker='.', linestyle='-', label='Partitioned domain')
+plt.figure(figsize=(10, 5), dpi=300)
+plt.plot(full_coords, du_dx, marker='.',  markersize=8, linestyle='-', label=f'Partitioned Solution\n{args.neumann.split("/")[0]}')
 
 if gt_exists:
     solution_gt_slice = solution_gt[TIMESTEP_TO_PLOT, :]
     du_dx_gt = np.gradient(solution_gt_slice, coords_gt[:, 0])
-    plt.plot(coords_gt[:, 0], du_dx_gt, marker='x', linestyle='--', alpha=0.5, c="red", label='Monolithic')
+    plt.plot(coords_gt[:, 0], du_dx_gt, marker='+', linestyle=':',  c="crimson", alpha=1, label='Monolithic Solution')
 
 plt.title(f'Gradient (du/dx) at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
 plt.ylabel('Gradient Value (du/dx)')
 plt.grid(True)
-plt.legend()
+
+u_max = np.max(du_dx)
+u_min = np.min(du_dx)
+u_interface = du_dx[full_coords.searchsorted(1.0)]
+u_offset = (u_max-u_min)*0.125
+plt.vlines(x=1, ymin=u_min-u_offset, ymax=u_interface-u_offset, color='gray', linestyle='--', label='Interface')
+plt.vlines(x=1, ymin=u_interface+u_offset, ymax=u_max+u_offset, color='gray', linestyle='--')
+
+plt.legend(loc='upper left')
 plt.savefig(os.path.join(CASE_DIR, f'gradient_timestep_slice.png'))
 print(f"Saved plot to gradient_timestep_slice.png")
 plt.close()
