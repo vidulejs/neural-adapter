@@ -90,7 +90,7 @@ def create_structured_grids(internal_coords, internal_values, boundary_coords, b
 
 if __name__ == "__main__":
 
-    DATA_DIR = "data/fluid-openfoam/"
+    DATA_DIR = "/home/dan/neural-adapter/tutorials/channel-transport/fluid-openfoam.template/data-training/"
     file_path = DATA_DIR + "run_001.npz"
     X_CELLS = 128
     Y_CELLS = 64
@@ -147,4 +147,5 @@ if __name__ == "__main__":
     plt.xlabel('X Coordinate')
     plt.ylabel('Y Coordinate')
     plt.legend(loc='lower right')
+    plt.savefig("structured_grid_visualization.png", dpi=300)
     plt.show()
