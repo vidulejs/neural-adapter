@@ -17,6 +17,7 @@ OUTPUT_SIZE = 160
 
 assert INPUT_SIZE >= OUTPUT_SIZE, "Input size must be greater or equal to output size."
 assert (INPUT_SIZE - OUTPUT_SIZE) % 2 == 0, "Input and output sizes must differ by an even number (for ghost cells)."
+GHOST_CELLS = INPUT_SIZE - OUTPUT_SIZE
 
 NUM_RES_BLOCKS = 4
 KERNEL_SIZE = 5
@@ -26,4 +27,7 @@ EPOCHS = 100
 BATCH_SIZE = 64
 LR = 1e-4
 SPLIT = 0.7  # Train/val split fraction
+GRADIENT_LOSS_WEIGHT = 5e-2
+NUM_STEPS_PER_EPOCH = 300
+EARLY_STOPPING = 50
 UNROLL_STEPS = 5

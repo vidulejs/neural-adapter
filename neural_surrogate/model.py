@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils import weight_norm
+from torch.nn.utils.parametrizations import weight_norm
 
 def pad_with_ghost_cells(input_seq, bc_left, bc_right):
     return torch.cat([bc_left, input_seq, bc_right], dim=1)
@@ -20,49 +20,44 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
-class MLP_RES(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, activation=nn.ReLU):
-        super(MLP_RES, self).__init__()
+class ResidualBlockMLP(nn.Module):
+    def __init__(self, size, activation=nn.ReLU):
+        super(ResidualBlockMLP, self).__init__()
+        self.fc1 = nn.Linear(size, size)
+        self.fc2 = nn.Linear(size, size)
         self.activation = activation()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        if output_size == input_size - 2:
-            print("Assuming ghost cells")
-            #assuming ghost cells are included in input_size
-            self.ghost_cells = True
-            self.output_size = self.input_size
-            output_size = self.input_size
-        
-        
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
-        
-        self.identity_proj = torch.ones(input_size, hidden_size, requires_grad=False) if input_size != hidden_size else None
-        self.identity_proj /= (hidden_size/input_size) # scaling
-
-    def to(self, device):
-        self.identity_proj = self.identity_proj.to(device) if self.identity_proj is not None else None
-        return super().to(device)
 
     def forward(self, x):
-        input = x
-        
-        out = self.activation(self.fc1(input))
-        if self.identity_proj is not None:
-            identity = input @ self.identity_proj
-        out = out + identity
-        
-        out = self.activation(self.fc2(out))
-        out = out + identity
-        
-        out = self.fc3(out)
-        out = out + input
+        identity = x
+        out = self.activation(self.fc1(x))
+        out = self.fc2(out)
+        return self.activation(out) + identity
 
-        if self.ghost_cells:
-            out = out[:, 1:-1] # remove ghost cells
+class MLP_RES(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_blocks=4, activation=nn.ReLU):
+        super(MLP_RES, self).__init__()
+        self.activation = activation()
 
+        # An initial projection layer to get to the hidden size
+        self.fc_in = nn.Linear(input_size, hidden_size)
+        
+        # A sequence of residual blocks that operate on the hidden size
+        layers = [ResidualBlockMLP(hidden_size, activation) for _ in range(num_blocks)]
+        self.res_blocks = nn.Sequential(*layers)
+        
+        # A final layer to project to the output size
+        self.fc_out = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        # 1. Project input to hidden dimension
+        out = self.activation(self.fc_in(x))
+        
+        # 2. Pass through residual blocks
+        out = self.res_blocks(out)
+        
+        # 3. Project to output dimension
+        out = self.fc_out(out)
+        
         return out
 
 class LinearExtrapolationPadding1D(nn.Module):
@@ -121,6 +116,7 @@ class ResidualBlock1D(nn.Module):
         out = self.conv2(out)
 
         return self.activation(out) + identity
+    
 class CNN_RES(nn.Module):
     def __init__(self, hidden_channels, num_blocks=2, kernel_size=3, activation=nn.ReLU, ghost_cells=2):
         super(CNN_RES, self).__init__()
