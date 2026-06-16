@@ -7,7 +7,7 @@ import os
 _SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_PATH, os.pardir))
 
-DATA_DIR = "tutorials/partitioned-burgers-1d/solver-scipy-fvolumes/data-training"
+DATA_DIR = "tutorials/partitioned-burgers-1d/solver-scipy/data-training"
 DATA_DIR = os.path.join(PROJECT_ROOT, DATA_DIR)
 
 # Model architecture

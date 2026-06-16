@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import json
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -90,8 +91,9 @@ def create_structured_grids(internal_coords, internal_values, boundary_coords, b
 
 if __name__ == "__main__":
 
-    DATA_DIR = "/home/dan/neural-adapter/tutorials/channel-transport/fluid-openfoam.template/data-training/"
-    file_path = DATA_DIR + "run_001.npz"
+    _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
+    DATA_DIR = os.path.join(_PROJECT_ROOT, "tutorials/channel-transport/fluid-openfoam.template/data-training/")
+    file_path = os.path.join(DATA_DIR, "run_001.npz")
     X_CELLS = 128
     Y_CELLS = 64
     timestep_to_map = -1
