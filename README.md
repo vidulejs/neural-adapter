@@ -1,7 +1,6 @@
 # Neural Adapter
 
- <!-- Let's relax framework to something less ambitious. like a dev repo -->
-A framework for generating simulation data and training neural-network (NN)
+A project for generating simulation data and training neural-network (NN)
 surrogates for [preCICE](https://precice.org/)-coupled solvers.
 
 This is the development code used in the master's thesis *"Coupling Neural
