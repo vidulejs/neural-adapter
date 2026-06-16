@@ -5,20 +5,22 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('TIMESTEP_TO_PLOT', nargs='?', type=int, default=10, help="Timestep to plot, default is 10.")
-parser.add_argument("--neumann", default="neumann-scipy/neumann.npz", help="Path to the neumann participant's data file relative to the case directory.")
+parser.add_argument("--neumann", default="neumann-scipy/neumann.npz",
+                    help="Path to the neumann participant's data file relative to the case directory.")
 args = parser.parse_args()
 TIMESTEP_TO_PLOT = args.TIMESTEP_TO_PLOT
 
 CASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "dirichlet-scipy", "dirichlet.npz")
-NEUMANN_DATA_PATH = os.path.join(CASE_DIR, args.neumann)
+IMAGES_DIR = os.path.join(CASE_DIR, "../output")
+os.makedirs(IMAGES_DIR, exist_ok=True)
+DIRICHLET_DATA_PATH = os.path.join(CASE_DIR, "../dirichlet-scipy", "dirichlet.npz")
+NEUMANN_DATA_PATH = os.path.join(CASE_DIR, "..", args.neumann)
 
-MONOLITHIC_DATA_PATH = os.path.join(CASE_DIR, "solver-scipy-fvolumes", "full_domain.npz")
+MONOLITHIC_DATA_PATH = os.path.join(CASE_DIR, "../solver-scipy", "full_domain.npz")
 if os.path.exists(MONOLITHIC_DATA_PATH):
-    print(f"Found Monolithic data at {MONOLITHIC_DATA_PATH}")
     gt_exists = True
 else:
-    print(f"Monolithic data not found at {MONOLITHIC_DATA_PATH}.\nPlease run python3 solver-scipy-fvolumes/solver.py None.")
+    print(f"Monolithic data not found at {MONOLITHIC_DATA_PATH}.\nPlease run python3 solver-scipy/solver.py None.")
     gt_exists = False
 
 print(f"Loading data from {DIRICHLET_DATA_PATH}")
@@ -46,10 +48,17 @@ if gt_exists:
 
 # --- plot single timestep ---
 plt.figure(figsize=(10, 5), dpi=300)
-plt.plot(full_coords, full_solution_history[TIMESTEP_TO_PLOT, :], marker='.', markersize=8, linestyle='-', label=f'Partitioned Solution\n{args.neumann.split("/")[0]}')
+plt.plot(full_coords,
+         full_solution_history[TIMESTEP_TO_PLOT,
+                               :],
+         marker='.',
+         markersize=8,
+         linestyle='-',
+         label=f'Partitioned Solution\n{args.neumann.split("/")[0]}')
 
 if gt_exists:
-    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='+', linestyle=':',  c="crimson", alpha=1, label='Monolithic Solution')
+    plt.plot(coords_gt[:, 0], solution_gt[TIMESTEP_TO_PLOT, :], marker='+',
+             linestyle=':', c="crimson", alpha=1, label='Monolithic Solution')
 plt.title(f'Solution at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
 plt.ylabel('Solution Value (u)')
@@ -58,13 +67,13 @@ plt.grid(True)
 u_max = np.max(full_solution_history[TIMESTEP_TO_PLOT, :])
 u_min = np.min(full_solution_history[TIMESTEP_TO_PLOT, :])
 u_interface = full_solution_history[TIMESTEP_TO_PLOT, full_coords.searchsorted(1.0)]
-u_offset = (u_max-u_min)*0.125
-plt.vlines(x=1, ymin=u_min-u_offset, ymax=u_interface-u_offset, color='gray', linestyle='--', label='Interface')
-plt.vlines(x=1, ymin=u_interface+u_offset, ymax=u_max+u_offset*2, color='gray', linestyle='--')
+u_offset = (u_max - u_min) * 0.125
+plt.vlines(x=1, ymin=u_min - u_offset, ymax=u_interface - u_offset, color='gray', linestyle='--', label='Interface')
+plt.vlines(x=1, ymin=u_interface + u_offset, ymax=u_max + u_offset * 2, color='gray', linestyle='--')
 
 plt.legend(loc='upper left')
-plt.savefig(os.path.join(CASE_DIR, f'full_domain_timestep_slice.png'))
-print(f"Saved plot to full_domain_timestep_slice.png")
+plt.savefig(os.path.join(IMAGES_DIR, f'full_domain_timestep_slice.png'))
+print(f"Saved plot to output/full_domain_timestep_slice.png")
 
 if gt_exists:
     # residual
@@ -88,7 +97,7 @@ if gt_exists:
     grad_at_interface_plot = (u_plot_gt[interface_idx + 1] - u_plot_gt[interface_idx]) / dx
 
     print("---")
-    print("Monolithic u at interface:")
+    print("Monolithic solution u at interface:")
     print(f"  t=0: u = {val_at_interface_t0:8.4f}, du/dx = {grad_at_interface_t0:8.4f}")
     print(f"  t={TIMESTEP_TO_PLOT}: u = {val_at_interface_plot:8.4f}, du/dx = {grad_at_interface_plot:8.4f}")
     print()
@@ -102,12 +111,13 @@ solution_slice = full_solution_history[TIMESTEP_TO_PLOT, :]
 du_dx = np.gradient(solution_slice, full_coords)
 
 plt.figure(figsize=(10, 5), dpi=300)
-plt.plot(full_coords, du_dx, marker='.',  markersize=8, linestyle='-', label=f'Partitioned Solution\n{args.neumann.split("/")[0]}')
+plt.plot(full_coords, du_dx, marker='.', markersize=8, linestyle='-',
+         label=f'Partitioned Solution\n{args.neumann.split("/")[0]}')
 
 if gt_exists:
     solution_gt_slice = solution_gt[TIMESTEP_TO_PLOT, :]
     du_dx_gt = np.gradient(solution_gt_slice, coords_gt[:, 0])
-    plt.plot(coords_gt[:, 0], du_dx_gt, marker='+', linestyle=':',  c="crimson", alpha=1, label='Monolithic Solution')
+    plt.plot(coords_gt[:, 0], du_dx_gt, marker='+', linestyle=':', c="crimson", alpha=1, label='Monolithic Solution')
 
 plt.title(f'Gradient (du/dx) at Timestep {TIMESTEP_TO_PLOT}')
 plt.xlabel('Spatial Coordinate (x)')
@@ -117,13 +127,13 @@ plt.grid(True)
 u_max = np.max(du_dx)
 u_min = np.min(du_dx)
 u_interface = du_dx[full_coords.searchsorted(1.0)]
-u_offset = (u_max-u_min)*0.125
-plt.vlines(x=1, ymin=u_min-u_offset, ymax=u_interface-u_offset, color='gray', linestyle='--', label='Interface')
-plt.vlines(x=1, ymin=u_interface+u_offset, ymax=u_max+u_offset, color='gray', linestyle='--')
+u_offset = (u_max - u_min) * 0.125
+plt.vlines(x=1, ymin=u_min - u_offset, ymax=u_interface - u_offset, color='gray', linestyle='--', label='Interface')
+plt.vlines(x=1, ymin=u_interface + u_offset, ymax=u_max + u_offset, color='gray', linestyle='--')
 
 plt.legend(loc='upper left')
-plt.savefig(os.path.join(CASE_DIR, f'gradient_timestep_slice.png'))
-print(f"Saved plot to gradient_timestep_slice.png")
+plt.savefig(os.path.join(IMAGES_DIR, f'gradient_timestep_slice.png'))
+print(f"Saved plot to output/gradient_timestep_slice.png")
 plt.close()
 
 # --- plot time evolution ---
@@ -134,8 +144,8 @@ plt.colorbar(label='Solution Value (u)')
 plt.title('Time Evolution of Partitioned Burgers eq.')
 plt.xlabel('Timestep')
 plt.ylabel('Spatial Coordinate (x)')
-plt.xticks(np.arange(0, full_solution_history.shape[0], step=max(1, full_solution_history.shape[0]//10)))
+plt.xticks(np.arange(0, full_solution_history.shape[0], step=max(1, full_solution_history.shape[0] // 10)))
 plt.tight_layout()
-plt.savefig(os.path.join(CASE_DIR, 'full_domain_evolution.png'))
-print("Saved plot to full_domain_evolution.png")
+plt.savefig(os.path.join(IMAGES_DIR, 'full_domain_evolution.png'))
+print("Saved plot to output/full_domain_evolution.png")
 plt.close()

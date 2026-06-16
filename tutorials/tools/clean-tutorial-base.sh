@@ -9,3 +9,6 @@ clean_precice_logs .
 rm -fv ./*.log
 rm -fv ./*.vtu
 
+# Clean up root directory
+rm -f initial_condition.npz
+rm -rf output/
