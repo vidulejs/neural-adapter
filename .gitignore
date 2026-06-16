@@ -38,3 +38,5 @@ tutorials/channel-transport/fluid-openfoam.template/param_sets/*.yml
 *.npz
 *.png
 *.log
+# Local virtual environment
+.venv/
